@@ -1,0 +1,64 @@
+# Copy this file to config.toml and edit. config.toml is not committed.
+# Every setting is optional; anything left out uses the default shown.
+# Environment variables (WOWFLIP_*) override this file; see README.
+
+[account]
+region = "us"            # us, eu, kr, tw
+ruleset_id = 2           # 1 PvP, 2 Normal, 3 RP, 15 RP PvP
+house_id = 111           # 111 = Alliance Normal (117 = Blackwater Normal)
+include_commodities = true
+bankroll_gold = 30       # starting gold; `wowflip bankroll 45` overrides it later
+
+[schedule]
+minute = 20              # minute past the hour for `wowflip scan --loop`
+
+[storage]
+data_dir = "data"        # SQLite history and logs
+report_dir = "reports"   # latest.html, latest.csv, flag_log.csv
+
+[items]
+override_csv = "items_override.csv"
+max_new_lookups_per_run = 1000
+
+# Market-wide rules. Values are first guesses from the scoring rules doc.
+[market]
+# history_days = 14
+# recent_days = 3
+# undercut = 0.03
+# ah_cut = 0.05
+# listing_hours = 24          # 2, 8 or 24
+# deposit_rates = { "2" = 0.05, "8" = 0.20, "24" = 0.60 }
+# min_history_days = 7
+# min_seen_share = 0.70
+# sales_price_floor = 0.80
+# min_auctions = 5
+# max_price_point_share = 0.60
+# crash_ratio = 0.85
+# balanced_at_gold = 200      # switch from careful to balanced above this bankroll
+
+# Buy rules while bankroll is under balanced_at_gold. Money is in copper
+# (1 silver = 100, 1 gold = 10000).
+[profiles.careful]
+# min_discount = 0.30
+# min_profit_per_unit = 1000      # 10 silver
+# min_profit_per_flip = 5000      # 50 silver
+# min_roi = 0.25
+# min_daily_sales = 5
+# max_days_to_sell = 2
+# max_flip_share = 0.15
+# max_item_days_of_sales = 2
+# volatility_cap = 0.5
+# item_classes = ["Trade Goods", "Consumable"]
+
+[profiles.balanced]
+# min_discount = 0.25
+# min_profit_per_unit = 2500
+# min_profit_per_flip = 20000
+# min_roi = 0.20
+# min_daily_sales = 3
+# max_days_to_sell = 3
+# max_flip_share = 0.20
+# max_item_days_of_sales = 3
+# volatility_cap = 0.6
+# item_classes = ["Trade Goods", "Consumable", "Weapon", "Armor"]
+# allow_boe_gear = true
