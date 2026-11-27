@@ -10,4 +10,7 @@
 Util.lua
 Core.lua
 Tooltip.lua
+Dialog.lua
+Trade.lua
+Mail.lua
 Panel.lua

@@ -70,11 +70,14 @@ local function InitDB()
     db.done = type(db.done) == "table" and db.done or {}
     db.done.items = type(db.done.items) == "table" and db.done.items or {}
     db.settings = type(db.settings) == "table" and db.settings or {}
+    -- Flip items bought through the panel, so the Sell tab knows what to list
+    -- and what they cost: [itemID] = { qty, cost, relist, name, at }
+    db.bought = type(db.bought) == "table" and db.bought or {}
     local s = db.settings
     if s.panel == nil then s.panel = true end -- show the panel with the AH
     if s.tooltip == nil then s.tooltip = true end
     if s.side ~= "left" then s.side = "right" end
-    if s.tab ~= "vendor" and s.tab ~= "snapshot" then s.tab = "market" end
+    if s.tab ~= "vendor" and s.tab ~= "snapshot" and s.tab ~= "sell" then s.tab = "market" end
 end
 
 local events = CreateFrame("Frame")
