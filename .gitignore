@@ -1,0 +1,15 @@
+# Your own settings and secrets (never commit these)
+.env
+config.toml
+
+# Scanner output
+data/
+reports/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
