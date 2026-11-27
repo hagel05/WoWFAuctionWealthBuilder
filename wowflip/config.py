@@ -75,6 +75,9 @@ class Market:
     history_days: float = 14  # MV window
     recent_days: float = 3  # MV3 window
     undercut: float = 0.03  # T = (1 - undercut) * min(MV, MV3)
+    # WoW Forever's AH sells the newest listing first among equal prices (LIFO),
+    # so listings at your price are behind you and matching a price is enough.
+    newest_first_at_same_price: bool = True
     ah_cut: float = 0.05  # confirmed: faction AH
     listing_hours: int = 24  # default listing duration
     deposit_rates: dict = field(

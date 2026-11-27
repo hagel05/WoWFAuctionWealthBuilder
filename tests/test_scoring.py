@@ -136,7 +136,12 @@ def test_snapshot_flip_from_one_scan():
     assert flip is not None, reason
     assert flip.kind == "snapshot" and flip.quantity == 2
     assert flip.reference == 20_400  # median of the other listings
-    assert flip.target == pytest.approx(0.97 * 20_000)  # just under the next listing up
+    # LIFO: matching the next listing (2g) would be enough, but 3% under the median is lower.
+    assert flip.target == pytest.approx(min(0.97 * 20_400, 20_000))
+    from dataclasses import replace as dc_replace
+    fifo = dc_replace(Market(), newest_first_at_same_price=False)
+    flip2, _ = evaluate_snapshot(deep_market([Listing(1, 1, 2, 11_000, "LONG")]), HERB, fifo, CAREFUL, 30 * GOLD)
+    assert flip2.target == pytest.approx(0.97 * 20_000)  # oldest-first: undercut the next listing
     assert flip.cost <= 0.10 * 30 * GOLD
 
 
@@ -154,3 +159,15 @@ def test_snapshot_rejections(listings, expect):
 
     flip, reason = evaluate_snapshot(listings, HERB, Market(), CAREFUL, 30 * GOLD)
     assert flip is None and expect in reason
+
+
+def test_lifo_listings_at_target_price_are_not_ahead():
+    from dataclasses import replace as dc_replace
+
+    # 6 units sit exactly at the target price (1.8624g). Under LIFO a fresh relist sells before them.
+    wall = [Listing(800 + i, 1, 1, 18_624, "LONG") for i in range(6)]
+    lifo, _ = evaluate_item(herb_market(), herb_listings(wall), HERB, Market(), CAREFUL, 30 * GOLD)
+    fifo_market = dc_replace(Market(), newest_first_at_same_price=False)
+    fifo, _ = evaluate_item(herb_market(), herb_listings(wall), HERB, fifo_market, CAREFUL, 30 * GOLD)
+    assert lifo.days_to_sell == pytest.approx(11 / 12)
+    assert fifo.days_to_sell == pytest.approx(17 / 12)

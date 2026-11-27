@@ -176,6 +176,7 @@ The rules follow the "Flip scoring rules" doc. In short, per unit, with B = buy 
 - **Net profit** = T × 0.95 − B − expected lost deposits, where the deposit is 60% of the vendor price for a 24 hour listing and is lost only if the listing expires.
 - **Buy** when the discount is at least 30%, profit is at least 10s per unit and 50s per flip, ROI is at least 25%, the item sells 5 or more a day near MV, it should sell within 2 days, and the flip costs at most 15% of your bankroll.
 - **Skip** items with under 7 days of history, fewer than 5 auctions, one price point holding over 60% of the supply, a falling price (MV3 under 85% of MV), a sudden buyout and price jump, or prices that swing too much.
+- **Last in, first out:** WoW Forever sells the newest listing first among equal prices, so listings already at your relist price do not count as ahead of you, and snapshot flips match the next listing instead of undercutting it. Set `newest_first_at_same_price = false` under `[market]` if that changes.
 - **Rank** by net profit × quantity × min(1, daily sales ÷ quantity) ÷ (1 + volatility), roughly gold per day.
 
 The early and snapshot rules are under `[market]` in `config.toml` (`ramp_start_days`, `ramp_extra_discount`, `snapshot_flips = false` to turn snapshot flips off, and so on).
