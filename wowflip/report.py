@@ -44,7 +44,7 @@ def write_reports(result: ScanResult, cfg: Config) -> Path:
                         round(f.target), round(f.net_profit), round(f.roi, 3),
                         round(f.days_to_sell, 2), round(f.score)])
         for v in result.vendor:
-            w.writerow(["vendor", v.item_id, v.name, f"{v.quantity} @ {money(v.unit_price)}", v.quantity,
+            w.writerow(["vendor", v.item_id, v.name, f"{v.listings} listings up to {money(v.unit_price)}", v.quantity,
                         v.cost, v.sell_price, v.profit, round(v.profit / v.cost, 3) if v.cost else "", "", ""])
 
     # Running log of every flag, to tune the rules later.
@@ -101,12 +101,12 @@ def render_html(result: ScanResult, cfg: Config, stamp: str) -> str:
     )
 
     vrows = [
-        f"<tr><td>{e(v.name)}</td><td class=num>{v.quantity}</td><td class=num>{money(v.unit_price)}</td>"
+        f"<tr><td>{e(v.name)}</td><td class=num>{v.quantity} ({v.listings} listings)</td><td class=num>{money(v.unit_price)}</td>"
         f"<td class=num>{money(v.sell_price)}</td><td class=num>{money(v.profit)}</td></tr>"
         for v in result.vendor[:50]
     ]
     vendor_html = (
-        "<div class=wrap><table><tr><th>Item</th><th class=num>Qty</th><th class=num>Price each</th>"
+        "<div class=wrap><table><tr><th>Item</th><th class=num>Qty</th><th class=num>Pay up to (each)</th>"
         "<th class=num>Vendor pays</th><th class=num>Profit</th></tr>" + "".join(vrows) + "</table></div>"
         if vrows else "<p>None this hour.</p>"
     )
@@ -143,5 +143,5 @@ def print_summary(result: ScanResult, report_path: Path) -> None:
     for f in result.flips[:10]:
         print(f"  {f.name}: buy {_buys_text(f)}, relist at {money(f.target)}, profit {money(f.net_profit)}")
     for v in result.vendor[:5]:
-        print(f"  [vendor] {v.name}: {v.quantity} @ {money(v.unit_price)}, profit {money(v.profit)}")
+        print(f"  [vendor] {v.name}: {v.quantity} up to {money(v.unit_price)} each, profit {money(v.profit)}")
     print(f"Report: {report_path.resolve()}")

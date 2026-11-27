@@ -91,3 +91,15 @@ def test_money_format():
     assert money(18_624) == "1g 86s 24c"
     assert money(57) == "57c"
     assert money(1_000) == "10s 0c"
+
+
+def test_vendor_flips_grouped_with_floor_and_budget():
+    from wowflip.scoring import vendor_flips
+
+    info = ItemInfo(item_id=7, name="Oil", class_name="Trade Goods", sell_price=100)
+    ls = [Listing(1, 7, 10, 50, "LONG"), Listing(2, 7, 10, 60, "LONG"), Listing(3, 7, 5, 120, "LONG")]
+    [v] = vendor_flips(ls, info, min_profit=0)
+    assert (v.quantity, v.cost, v.unit_price, v.listings, v.profit) == (20, 1100, 60, 2, 900)
+    assert vendor_flips(ls, info, min_profit=1000) == []
+    [v] = vendor_flips(ls, info, min_profit=0, budget=700)
+    assert v.quantity == 10

@@ -34,6 +34,7 @@ max_new_lookups_per_run = 1000
 # min_auctions = 5
 # max_price_point_share = 0.60
 # crash_ratio = 0.85
+# min_vendor_profit = 1000   # 10 silver; vendor flips worth less are hidden
 # balanced_at_gold = 200      # switch from careful to balanced above this bankroll
 
 # Buy rules while bankroll is under balanced_at_gold. Money is in copper

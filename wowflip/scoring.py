@@ -284,27 +284,42 @@ def evaluate_item(
 
 @dataclass
 class VendorFlip:
+    """All listings of one item priced below what a vendor pays for it."""
+
     item_id: int
     name: str
-    unit_price: int
+    unit_price: int  # highest price paid per unit among the listings to buy
     quantity: int
     sell_price: int
+    cost: int
+    listings: int = 1
 
     @property
     def profit(self) -> int:
-        return (self.sell_price - self.unit_price) * self.quantity
-
-    @property
-    def cost(self) -> int:
-        return self.unit_price * self.quantity
+        return self.sell_price * self.quantity - self.cost
 
 
-def vendor_flips(listings: list[Listing], info: ItemInfo | None) -> list[VendorFlip]:
-    """Listings priced below what a vendor pays: buy and sell to a vendor, no AH fees."""
+def vendor_flips(
+    listings: list[Listing], info: ItemInfo | None, min_profit: int = 0, budget: int | None = None
+) -> list[VendorFlip]:
+    """Buy listings below vendor price (cheapest first, within budget), sell to a vendor.
+
+    No AH fees apply. Returns at most one entry per item, and none if the
+    total profit is under min_profit.
+    """
     if info is None or not info.sell_price:
         return []
-    return [
-        VendorFlip(l.item_id, info.name or f"item {l.item_id}", l.unit_price, l.quantity, info.sell_price)
-        for l in listings
-        if l.unit_price < info.sell_price
-    ]
+    qty = cost = count = top = 0
+    for l in sorted(listings, key=lambda l: l.unit_price):
+        if l.unit_price >= info.sell_price:
+            break
+        if budget is not None and cost + l.unit_price * l.quantity > budget:
+            break
+        qty += l.quantity
+        cost += l.unit_price * l.quantity
+        count += 1
+        top = l.unit_price
+    if not qty:
+        return []
+    flip = VendorFlip(info.item_id, info.name or f"item {info.item_id}", top, qty, info.sell_price, cost, count)
+    return [flip] if flip.profit >= min_profit else []

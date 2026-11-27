@@ -8,7 +8,7 @@ It is set up for **US, Normal ruleset, Alliance** (house 111), at 20 minutes pas
 
 `reports/latest.html` opens in any browser and shows:
 
-- **Vendor flips:** listings priced below what a vendor pays for the item. Buy them and sell to any vendor; there are no auction house fees, so these are risk-free.
+- **Vendor flips:** listings priced below what a vendor pays for the item, grouped per item and shown only when the total profit is at least 10 silver (`min_vendor_profit`). Buy them and sell to any vendor; there are no auction house fees, so these are risk-free.
 - **Market flips:** listings well below the item's usual price. For each one it lists which listings to buy (quantity at price), what to relist at for 24 hours, the expected profit after the 5% cut and deposits, and how many days it should take to sell.
 - **Skipped deals:** cheap listings that failed a rule, with the reason, so you can see what the scanner is avoiding.
 
@@ -120,7 +120,7 @@ Every threshold is a first guess and can be changed in `config.toml`. After a fe
 - **The Forever API is undocumented.** Blizzard's official Game Data docs describe the retail API, whose auction paths (`/data/wow/connected-realm/...`) do not work for Forever. The scanner uses the paths community testers found: `/data/wow/ruleset/{id}/auctions/{house}` and `.../commodities` in the `dynamic-forever-us` namespace. These can change without notice; `wowflip check` is the quickest way to see if they still work.
 - **Sales are estimated.** The API has no sales history or seller names. A listing that disappears while it still had hours left counts as sold, so cancellations are counted too and the estimate is an upper bound. That is why the rules ask for 5 sales a day and a 30% discount.
 - **Some items have no details.** About 43% of item ids returned 404 from the item endpoint in community tests. Those items are skipped because their type and vendor price are unknown. You can add them to `items_override.csv` (copy `items_override.example.csv`; `sell_price` is in copper), for example from an AHDB addon export.
-- **Vendor price** comes from the item endpoint's `sell_price`. It is unconfirmed whether Forever returns it; `wowflip check` prints whether it does. Without it, deposits count as zero and vendor flips cannot be found.
+- **Vendor price** comes from the item endpoint's `sell_price`. In the first live scan (27 Nov 2026) every item that resolved had one.
 - **Item variants** such as random "of the Bear" suffixes are grouped under one item id. That does not matter for trade goods and consumables, but should be revisited before gear flips matter (above 200g).
 - **Rate limits:** one scan makes 2 requests plus one per never-seen item (up to 1,000 on the first runs, cached forever after), well under Blizzard's usual limits.
 
