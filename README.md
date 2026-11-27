@@ -81,9 +81,65 @@ Or keep a window open with `wowflip scan --loop --now`, which scans immediately 
 
 Missed hours are fine. They leave gaps in the history, and the scanner only counts sales across gaps short enough to tell a sale from an expired listing.
 
+## In-game addon
+
+The **WoWFlip** addon shows the flip list in game. When you open the Auction House, a **Flips** panel docks beside it:
+
+- **Market** tab: each flip with what to buy (quantity and the most to pay per unit), what to relist at, and the profit after fees. Hover a row to see the exact listings to buy.
+- **Vendor** tab: listings under what a vendor pays.
+- **Click** a row to search for it in the Auction House, then buy it yourself (addons are not allowed to buy for you). **Right-click** a row to cross it off until the next scan.
+- A cost shown in red means you do not have that much gold on you.
+- **Item tooltips** everywhere get a line such as "Flip: buy up to 12s each (8), relist at 18s", plus the item's market value and daily sales.
+
+Commands: `/flip` shows or hides the panel, `/flip left` or `/flip right` docks it on that side, `/flip auto` turns opening with the AH on or off, `/flip tooltip` turns the tooltip lines on or off, and `/flip status` says when the data was scanned.
+
+### How the data gets into the game
+
+Addons cannot use the internet, so the data travels the way TradeSkillMaster's helper does it: after each scan, the scanner (or the sync helper on another PC) writes the list into a second small addon, **WoWFlipData**, in your AddOns folder. The game reads it when you log in or type `/reload`, so **type `/reload` after the :20 scan to see the new hour's list**. The panel turns red when its data is more than 90 minutes old.
+
+The addon also notes your gold each time you open the Auction House. The game saves that when you log out or `/reload`, and the next scan uses it as your bankroll, so you no longer need `wowflip bankroll`.
+
+### Setup on the PC where the scanner runs
+
+1. Install the addon (default WoW folder shown; pass `-WowDir` if yours differs):
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\install_addon.ps1
+   ```
+
+2. Add your WoW folder to `config.toml`:
+
+   ```toml
+   [addon]
+   wow_dir = "C:/Program Files (x86)/World of Warcraft"
+   ```
+
+3. Run `wowflip scan` (or wait for the hourly task), then `/reload` in game. Check it with `/flip status`.
+
+Nothing else is needed on this PC: every scan updates the addon directly. `wowflip sync` does the same thing on demand.
+
+### Other PCs, and the TrueNAS setup
+
+When the scanner runs on a server (see "Running in Docker" below), each PC you play on runs the small **sync helper**, which fetches the latest list from the server every 5 minutes and sends your in-game gold back.
+
+1. Download **WoWFlipSync** from the latest successful run on the repository's Actions tab (or build it with `scripts\build_sync_exe.ps1`). It contains `WoWFlipSync.exe`, the addon and the install scripts. No Python needed.
+2. Install the addon with `scripts\install_addon.ps1`.
+3. Next to `WoWFlipSync.exe`, create `config.toml`:
+
+   ```toml
+   [addon]
+   wow_dir = "C:/Program Files (x86)/World of Warcraft"
+   sync_url = "http://truenas.local:8787"
+   ```
+
+   If the server has `WOWFLIP_API_TOKEN` set, set the same value as a Windows environment variable on the PC.
+4. Run `install_sync_task.ps1` from that folder so the helper starts at every logon. `WoWFlipSync.exe --once` syncs a single time.
+
+If you play on more than one character, set `bankroll_characters = ["Name - Realm", ...]` under `[addon]` to add up their gold; otherwise the last character that opened the Auction House is used.
+
 ## Keeping your bankroll current
 
-Per-flip limits are a share of your gold (15% while careful), so tell the scanner when your gold changes:
+With the addon installed and `wow_dir` set, this is automatic (see above). Without it, per-flip limits are a share of your gold (15% while careful), so tell the scanner when your gold changes:
 
 ```powershell
 wowflip bankroll 42.5     # set to 42g 50s
@@ -101,6 +157,8 @@ Above 200g it switches automatically from the **careful** profile (trade goods a
 | `wowflip report` | Rebuild the report from stored data without calling the API (use after changing settings) |
 | `wowflip bankroll [gold]` | Show or set your current gold |
 | `wowflip check` | Test credentials and the Forever API endpoints |
+| `wowflip sync [--loop] [--force]` | Copy the latest flip list into the in-game addon on this PC |
+| `wowflip serve [--with-scanner]` | Run the API that sync helpers on other PCs read from (port 8787) |
 
 ## How flips are scored
 
@@ -124,7 +182,7 @@ Every threshold is a first guess and can be changed in `config.toml`. After a fe
 - **Item variants** such as random "of the Bear" suffixes are grouped under one item id. That does not matter for trade goods and consumables, but should be revisited before gear flips matter (above 200g).
 - **Rate limits:** one scan makes 2 requests plus one per never-seen item (up to 1,000 on the first runs, cached forever after), well under Blizzard's usual limits.
 
-## Running in Docker (for later, such as TrueNAS)
+## Running in Docker (TrueNAS)
 
 The core has no Windows-specific code; everything can be configured with environment variables, and all state lives in one data folder.
 
@@ -132,16 +190,20 @@ The core has no Windows-specific code; everything can be configured with environ
 docker build -t wowflip .
 docker run -d --name wowflip --restart unless-stopped \
   -e BLIZZARD_CLIENT_ID=... -e BLIZZARD_CLIENT_SECRET=... \
+  -e WOWFLIP_API_TOKEN=some-long-random-text \
   -e TZ=America/Chicago \
+  -p 8787:8787 \
   -v /mnt/pool/apps/wowflip:/data \
   wowflip
 ```
 
-The container scans at :20 every hour and writes reports to `/data/reports`. Put an optional `config.toml` and `items_override.csv` in the data folder. Environment variables: `WOWFLIP_REGION`, `WOWFLIP_RULESET_ID`, `WOWFLIP_HOUSE_ID`, `WOWFLIP_BANKROLL_GOLD`, `WOWFLIP_DATA_DIR`, `WOWFLIP_REPORT_DIR`, `WOWFLIP_ITEM_OVERRIDE_CSV`, `WOWFLIP_SCAN_MINUTE`, `WOWFLIP_INCLUDE_COMMODITIES`, `WOWFLIP_CONFIG`. To move your history from the PC, copy the `data` folder into the volume.
+The container scans at :20 every hour, writes reports to `/data/reports`, and serves the API on port 8787 for the sync helpers: `/api/v1/feed` (the flip list), `/api/v1/bankroll` (gold from the game) and `/health`. Opening `http://truenas.local:8787/` in a browser shows the latest HTML report. Keep the port on your home network; do not forward it to the internet. Put an optional `config.toml` and `items_override.csv` in the data folder. Environment variables: `WOWFLIP_REGION`, `WOWFLIP_RULESET_ID`, `WOWFLIP_HOUSE_ID`, `WOWFLIP_BANKROLL_GOLD`, `WOWFLIP_DATA_DIR`, `WOWFLIP_REPORT_DIR`, `WOWFLIP_ITEM_OVERRIDE_CSV`, `WOWFLIP_SCAN_MINUTE`, `WOWFLIP_INCLUDE_COMMODITIES`, `WOWFLIP_CONFIG`, `WOWFLIP_API_TOKEN`, `WOWFLIP_SERVER_PORT`. To move your history from the PC, copy the `data` folder into the volume.
 
 ## Troubleshooting
 
-- **"credentials are missing"**: `.env` is not in the folder you ran the command from, or the names are misspelled.
+- **"credentials are missing"**: `BLIZZARD_CLIENT_ID` / `BLIZZARD_CLIENT_SECRET` are not set as environment variables (open a new PowerShell window after setting them) and there is no `.env` next to `config.toml`, or the names are misspelled.
+- **The Flips panel says "No flip data yet"**: `wow_dir` is not set, or no scan has run since. Run `wowflip sync --force`, then `/reload`. The log says where it wrote `Data.lua`.
+- **The panel does not appear**: check that WoWFlip is ticked in the AddOns list on the character screen (enable "Load out of date AddOns" if a patch changed the interface number), and try `/flip`.
 - **"rejected the API credentials (HTTP 401)"**: the Client ID or Secret is wrong; create a new secret on the Battle.net developer site.
 - **"Auction house 111 not found (404)"**: the Forever API paths changed. Run `wowflip check` and look at the house list it prints.
 - **Logs** are in `data\scan.log` (and `data\task.log` for the scheduled task).
@@ -152,5 +214,7 @@ The container scans at :20 every hour and writes reports to `/data/reports`. Put
 pip install -e ".[dev]"
 pytest
 ```
+
+The addon tests load the Lua addon with a stubbed WoW API and need `lua5.1` on the PATH (they are skipped without it; CI installs it).
 
 The tests include the worked example from the scoring rules doc and an end-to-end run against a simulated auction house.

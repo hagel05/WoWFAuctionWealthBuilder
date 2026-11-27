@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: WoWFlip
+## Notes: Shows the flip list from your wowflip scanner beside the Auction House, and flip prices on item tooltips.
+## Author: wowflip
+## Version: 0.1.0
+## SavedVariables: WoWFlipDB
+## OptionalDeps: WoWFlipData
+## IconTexture: Interface\Icons\INV_Misc_Coin_01
+
+Util.lua
+Core.lua
+Tooltip.lua
+Panel.lua

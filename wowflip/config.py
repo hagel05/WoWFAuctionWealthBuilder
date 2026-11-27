@@ -100,6 +100,24 @@ class Market:
 
 
 @dataclass(frozen=True)
+class Addon:
+    """In-game addon and sync helper settings (the [addon] section)."""
+
+    wow_dir: Path | None = None  # e.g. C:/Program Files (x86)/World of Warcraft
+    game_folder: str = "_forever_"  # client folder inside wow_dir
+    sync_url: str = ""  # scanner API on another machine, e.g. http://truenas:8787
+    sync_minutes: float = 5  # how often `wowflip sync --loop` checks for new data
+    bankroll_from_game: bool = True  # use the gold the addon saw as the bankroll
+    bankroll_characters: tuple[str, ...] = ()  # "Name - Realm"; empty = last character at the AH
+
+
+@dataclass(frozen=True)
+class Server:
+    host: str = "0.0.0.0"
+    port: int = 8787
+
+
+@dataclass(frozen=True)
 class Config:
     region: str = "us"
     ruleset_id: int = 2  # Normal
@@ -113,6 +131,9 @@ class Config:
     item_lookup_workers: int = 8
     scan_minute: int = 20
     market: Market = field(default_factory=Market)
+    addon: Addon = field(default_factory=Addon)
+    server: Server = field(default_factory=Server)
+    api_token: str = ""  # shared secret between the API and sync helpers; empty = no check
     careful: Profile = CAREFUL
     balanced: Profile = BALANCED
     client_id: str = ""
@@ -210,6 +231,15 @@ def load_config(path: Path | str = "config.toml") -> Config:
 
     if "market" in raw:
         cfg = replace(cfg, market=_override(cfg.market, raw["market"]))
+    if "addon" in raw:
+        a = dict(raw["addon"])
+        if a.get("wow_dir"):
+            a["wow_dir"] = Path(a["wow_dir"])
+        if "bankroll_characters" in a:
+            a["bankroll_characters"] = tuple(a["bankroll_characters"])
+        cfg = replace(cfg, addon=_override(cfg.addon, a))
+    if "server" in raw:
+        cfg = replace(cfg, server=_override(cfg.server, raw["server"]))
     profiles = raw.get("profiles", {})
     if "careful" in profiles:
         cfg = replace(cfg, careful=_override(cfg.careful, profiles["careful"]))
@@ -234,9 +264,24 @@ def load_config(path: Path | str = "config.toml") -> Config:
             env_changes[key] = cast(env[var])
     if env.get("WOWFLIP_INCLUDE_COMMODITIES"):
         env_changes["include_commodities"] = env["WOWFLIP_INCLUDE_COMMODITIES"].lower() in ("1", "true", "yes")
+    addon_env = {}
+    if env.get("WOWFLIP_WOW_DIR"):
+        addon_env["wow_dir"] = Path(env["WOWFLIP_WOW_DIR"])
+    if env.get("WOWFLIP_SYNC_URL"):
+        addon_env["sync_url"] = env["WOWFLIP_SYNC_URL"]
+    if addon_env:
+        env_changes["addon"] = replace(cfg.addon, **addon_env)
+    server_env = {}
+    if env.get("WOWFLIP_SERVER_HOST"):
+        server_env["host"] = env["WOWFLIP_SERVER_HOST"]
+    if env.get("WOWFLIP_SERVER_PORT"):
+        server_env["port"] = int(env["WOWFLIP_SERVER_PORT"])
+    if server_env:
+        env_changes["server"] = replace(cfg.server, **server_env)
     cfg = replace(
         cfg,
         **env_changes,
+        api_token=env.get("WOWFLIP_API_TOKEN", ""),
         client_id=env.get("BLIZZARD_CLIENT_ID", ""),
         client_secret=env.get("BLIZZARD_CLIENT_SECRET", ""),
     )
