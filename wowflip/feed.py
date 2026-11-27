@@ -19,20 +19,27 @@ FEED_VERSION = 1
 
 
 def build_feed(result: ScanResult, cfg: Config) -> dict:
-    flips = []
-    for f in result.flips:
-        flips.append({
+    def flip_row(f) -> dict:
+        row = {
             "item_id": f.item_id,
             "name": f.name,
+            "kind": f.kind,  # market | early | snapshot
             "buy_max": f.max_price,  # highest unit price worth paying
             "quantity": f.quantity,
             "cost": f.cost,
             "relist": int(round(f.target)),  # unit price to list at
             "profit": int(round(f.net_profit)),
             "roi": round(f.roi, 3),
-            "days_to_sell": round(f.days_to_sell, 1),
             "buys": [[b.unit_price, b.quantity] for b in f.buys],
-        })
+        }
+        if f.days_to_sell == f.days_to_sell:  # unknown (NaN) for snapshot flips
+            row["days_to_sell"] = round(f.days_to_sell, 1)
+        if f.kind == "snapshot":
+            row["reference"] = int(round(f.reference))  # what the other listings ask
+        return row
+
+    flips = [flip_row(f) for f in result.flips]
+    snapshot = [flip_row(f) for f in result.snapshots[:100]]
 
     # One row per item: buy every listing under what a vendor pays.
     vendor: dict[int, dict] = {}
@@ -56,6 +63,8 @@ def build_feed(result: ScanResult, cfg: Config) -> dict:
         "history_days": round(result.history_days, 1),
         "listing_hours": cfg.market.listing_hours,
         "flips": flips,
+        # Riskier flips judged from current listings only (items with no history yet).
+        "snapshot": snapshot,
         "vendor": vendor_rows[:100],
         # item id -> [market value in copper, units sold per day]
         "prices": {str(i): [int(round(mv)), round(ds, 1)] for i, (mv, ds) in sorted(result.prices.items())},

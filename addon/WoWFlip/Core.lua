@@ -1,7 +1,7 @@
 -- WoWFlip: loads the flip feed, records gold for the bankroll, handles events.
 local ADDON, ns = ...
 
-ns.flipsByItem, ns.vendorByItem = {}, {}
+ns.flipsByItem, ns.vendorByItem, ns.snapshotByItem = {}, {}, {}
 ns.feed = nil
 
 local OLD_AFTER = 90 * 60 -- a scan older than this is flagged as stale
@@ -14,7 +14,7 @@ ns.Now = Now
 -- Index the feed written by the sync helper (WoWFlipData addon).
 function ns.LoadFeed()
     local feed = WoWFlipData_Feed
-    ns.flipsByItem, ns.vendorByItem = {}, {}
+    ns.flipsByItem, ns.vendorByItem, ns.snapshotByItem = {}, {}, {}
     if type(feed) ~= "table" or feed.version ~= 1 then
         ns.feed = nil
         return
@@ -23,8 +23,10 @@ function ns.LoadFeed()
     feed.flips = feed.flips or {}
     feed.vendor = feed.vendor or {}
     feed.prices = feed.prices or {}
+    feed.snapshot = feed.snapshot or {} -- riskier flips from current listings only
     for _, f in ipairs(feed.flips) do ns.flipsByItem[f.item_id] = f end
     for _, v in ipairs(feed.vendor) do ns.vendorByItem[v.item_id] = v end
+    for _, f in ipairs(feed.snapshot) do ns.snapshotByItem[f.item_id] = f end
 end
 
 function ns.FeedAge()
@@ -72,7 +74,7 @@ local function InitDB()
     if s.panel == nil then s.panel = true end -- show the panel with the AH
     if s.tooltip == nil then s.tooltip = true end
     if s.side ~= "left" then s.side = "right" end
-    if s.tab ~= "vendor" then s.tab = "market" end
+    if s.tab ~= "vendor" and s.tab ~= "snapshot" then s.tab = "market" end
 end
 
 local events = CreateFrame("Frame")
@@ -88,8 +90,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_LOGIN" then
         ns.RecordGold()
         if ns.feed then
-            local msg = #ns.feed.flips .. " market flips and " .. #ns.feed.vendor ..
-                " vendor flips from a scan " .. ns.Ago(ns.FeedAge()) .. "."
+            local msg = #ns.feed.flips .. " market flips, " .. #ns.feed.snapshot .. " snapshot flips (riskier) and " ..
+                #ns.feed.vendor .. " vendor flips from a scan " .. ns.Ago(ns.FeedAge()) .. "."
             if ns.FeedIsOld() then msg = msg .. " That's old: is the sync helper running?" end
             ns.Print(msg)
         else
@@ -131,7 +133,8 @@ SlashCmdList["WOWFLIP"] = function(msg)
     elseif msg == "status" then
         if ns.feed then
             ns.Print("Scan " .. ns.Ago(ns.FeedAge()) .. ", house " .. tostring(ns.feed.house_id) ..
-                ", " .. #ns.feed.flips .. " market flips, " .. #ns.feed.vendor .. " vendor flips, bankroll " ..
+                ", " .. #ns.feed.flips .. " market flips, " .. #ns.feed.snapshot .. " snapshot flips, " ..
+                #ns.feed.vendor .. " vendor flips, bankroll " ..
                 ns.Money(ns.feed.bankroll) .. " (" .. tostring(ns.feed.profile) .. ").")
         else
             ns.Print("No flip data loaded.")

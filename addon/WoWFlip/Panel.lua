@@ -10,7 +10,8 @@ local panel, rows, offset = nil, {}, 0
 
 local function List()
     if not ns.feed then return {} end
-    local src = WoWFlipDB.settings.tab == "vendor" and ns.feed.vendor or ns.feed.flips
+    local tab = WoWFlipDB.settings.tab
+    local src = (tab == "vendor" and ns.feed.vendor) or (tab == "snapshot" and ns.feed.snapshot) or ns.feed.flips
     local out = {}
     for _, entry in ipairs(src) do
         if not ns.IsDone(entry.item_id) then out[#out + 1] = entry end
@@ -42,11 +43,13 @@ function ns.SearchAH(entry)
     return false
 end
 
+local TAGS = { early = "  |cffffd040early|r", snapshot = "  |cffffa040risky|r" }
+
 local function RowText(entry)
     local market = WoWFlipDB.settings.tab ~= "vendor"
     local line1, line2
     if market then
-        line1 = entry.name .. "  |cff40ff40+" .. ns.Money(entry.profit, true) .. "|r"
+        line1 = entry.name .. "  |cff40ff40+" .. ns.Money(entry.profit, true) .. "|r" .. (TAGS[entry.kind] or "")
         line2 = "Buy " .. entry.quantity .. " up to " .. ns.Money(entry.buy_max) .. ", relist " .. ns.Money(entry.relist)
     else
         line1 = entry.name .. "  |cff40ff40+" .. ns.Money(entry.profit, true) .. "|r"
@@ -63,15 +66,18 @@ function ns.RefreshPanel()
     if not panel or not panel:IsShown() then return end
     local list = List()
     offset = math.max(0, math.min(offset, #list - ROWS))
-    local market = WoWFlipDB.settings.tab ~= "vendor"
-    panel.marketTab:SetEnabled(not market)
-    panel.vendorTab:SetEnabled(market)
+    local tab = WoWFlipDB.settings.tab
+    local market = tab ~= "vendor"
+    panel.marketTab:SetEnabled(tab ~= "market")
+    panel.snapshotTab:SetEnabled(tab ~= "snapshot")
+    panel.vendorTab:SetEnabled(tab ~= "vendor")
+    local noun = (tab == "vendor" and " vendor flips") or (tab == "snapshot" and " snapshot flips (riskier)") or " flips"
 
     if not ns.feed then
         panel.status:SetText("No flip data yet. Run the sync helper, then /reload.")
     else
         local age = ns.Ago(ns.FeedAge())
-        local text = "Scanned " .. age .. "  ·  " .. #list .. (market and " flips" or " vendor flips")
+        local text = "Scanned " .. age .. "  ·  " .. #list .. noun
         if ns.FeedIsOld() then
             text = "|cffff6060Scanned " .. age .. ". /reload after the next sync.|r"
         end
@@ -128,6 +134,12 @@ local function OnRowEnter(row)
     end
     GameTooltip:AddLine("Click: search the Auction House", 0.6, 0.8, 1)
     GameTooltip:AddLine("Right-click: cross off until the next scan", 0.6, 0.8, 1)
+    if row.entry.kind == "snapshot" then
+        GameTooltip:AddLine("Riskier: priced against the other listings (" .. ns.Money(row.entry.reference) ..
+            ") with no sales history, so it may sell slowly.", 1, 0.63, 0.25, true)
+    elseif row.entry.kind == "early" then
+        GameTooltip:AddLine("Early: under a week of price history, so stricter rules applied.", 1, 0.82, 0.25, true)
+    end
     if WoWFlipDB.settings.tab ~= "vendor" and row.entry.buys then
         GameTooltip:AddLine("Listings to buy:", 1, 0.82, 0)
         for _, b in ipairs(row.entry.buys) do
@@ -183,7 +195,8 @@ local function Build()
         return b
     end
     panel.marketTab = Tab("Market", "market", 10)
-    panel.vendorTab = Tab("Vendor", "vendor", 94)
+    panel.snapshotTab = Tab("Snapshot", "snapshot", 94)
+    panel.vendorTab = Tab("Vendor", "vendor", 178)
 
     panel.status = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     panel.status:SetPoint("TOPLEFT", 12, -58)

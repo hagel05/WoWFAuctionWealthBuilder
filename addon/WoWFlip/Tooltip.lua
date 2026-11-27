@@ -1,7 +1,7 @@
 -- WoWFlip: flip prices on item tooltips.
 local ADDON, ns = ...
 
-local GREEN, GREY = "|cff40ff40", "|cff9d9d9d"
+local GREEN, GREY, ORANGE = "|cff40ff40", "|cff9d9d9d", "|cffffa040"
 
 -- Lines to add for an item id, as a list of strings (used by tests too).
 function ns.TooltipLines(itemID)
@@ -9,10 +9,17 @@ function ns.TooltipLines(itemID)
     if not itemID or not ns.feed then return lines end
     local f = ns.flipsByItem[itemID]
     if f then
-        lines[#lines + 1] = GREEN .. "Flip:|r buy up to " .. ns.Money(f.buy_max) .. " each (" .. f.quantity ..
+        lines[#lines + 1] = GREEN .. (f.kind == "early" and "Flip (early):|r" or "Flip:|r") .. " buy up to " .. ns.Money(f.buy_max) .. " each (" .. f.quantity ..
             "), relist at " .. ns.Money(f.relist)
-        lines[#lines + 1] = GREY .. "Profit about " .. ns.Money(f.profit, true) .. " after fees, sells in ~" ..
-            f.days_to_sell .. " days|r"
+        local speed = f.days_to_sell and (", sells in ~" .. f.days_to_sell .. " days") or ""
+        lines[#lines + 1] = GREY .. "Profit about " .. ns.Money(f.profit, true) .. " after fees" .. speed .. "|r"
+    end
+    local s = ns.snapshotByItem[itemID]
+    if s and not f then
+        lines[#lines + 1] = ORANGE .. "Snapshot flip (riskier):|r buy up to " .. ns.Money(s.buy_max) .. " each (" ..
+            s.quantity .. "), relist at " .. ns.Money(s.relist)
+        lines[#lines + 1] = GREY .. "Others list at " .. ns.Money(s.reference or 0, true) ..
+            "; no sales history yet, so it may sell slowly|r"
     end
     local v = ns.vendorByItem[itemID]
     if v then

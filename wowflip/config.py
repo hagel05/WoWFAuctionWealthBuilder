@@ -91,6 +91,22 @@ class Market:
     reset_rise: float = 0.50  # skip if min buyout rose > 50% in 24h ...
     reset_supply_drop: float = 0.50  # ... while units listed fell by more than half
     min_vendor_profit: int = 10 * SILVER  # skip vendor flips worth less than this per item
+    # Early market flips: from ramp_start_days of history, with stricter rules
+    # that relax linearly until min_history_days (guesses).
+    ramp_start_days: float = 2
+    ramp_extra_discount: float = 0.15  # +15 points on min discount at the start
+    ramp_extra_roi: float = 0.15  # +15 points on min ROI at the start
+    ramp_sales_factor: float = 2.0  # need 2x the daily sales at the start
+    ramp_share_factor: float = 0.5  # half the per-flip bankroll share at the start
+    # Snapshot flips: judged from the current listings alone, for items without
+    # ramp_start_days of history. Riskier: sales speed is unknown (guesses).
+    snapshot_flips: bool = True
+    snapshot_min_discount: float = 0.30  # cheapest vs median of the rest
+    snapshot_min_roi: float = 0.30
+    snapshot_min_auctions: int = 8  # listings left after buying
+    snapshot_flip_share: float = 0.10  # of bankroll per flip
+    snapshot_max_unit_share: float = 0.25  # buy at most this share of the units listed
+    snapshot_sell_chance: float = 0.5  # assumed chance a relist sells, for deposit risk
     balanced_at_gold: float = 200
     keep_days: float = 30  # prune history older than this
 

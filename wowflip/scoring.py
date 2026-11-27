@@ -16,10 +16,10 @@ Q is units already listed at or below T that we are not buying.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from wowflip.config import Market, Profile
-from wowflip.stats import median, percentile
+from wowflip.stats import median, percentile, unit_percentile
 from wowflip.store import ItemInfo, Listing
 
 DAY = 86_400
@@ -119,7 +119,7 @@ def net_profit_per_unit(b: float, t: float, cut: float, deposit: float, p: float
 def market_filters(m: MarketStats, listings: list[Listing], market: Market, profile: Profile) -> list[str]:
     """Reasons this item's market is untrustworthy (empty list = passes)."""
     reasons = []
-    if m.history_days < market.min_history_days:
+    if m.history_days < min(market.ramp_start_days, market.min_history_days):
         reasons.append(f"only {m.history_days:.1f} days of history")
     if m.seen_share < market.min_seen_share:
         reasons.append(f"listed in only {m.seen_share:.0%} of snapshots")
@@ -153,6 +153,28 @@ def market_filters(m: MarketStats, listings: list[Listing], market: Market, prof
     if m.volatility > profile.volatility_cap:
         reasons.append(f"volatile ({m.volatility:.2f})")
     return reasons
+
+
+def ramp_profile(profile: Profile, market: Market, history_days: float) -> tuple[Profile, bool]:
+    """Stricter rules while an item has less than a full week of history.
+
+    From ramp_start_days the extra strictness starts at its maximum and fades
+    linearly to the normal profile at min_history_days. Returns (profile, early).
+    """
+    full, start = market.min_history_days, market.ramp_start_days
+    if history_days >= full or full <= start:
+        return profile, False
+    s = min(1.0, max(0.0, (full - history_days) / (full - start)))
+    return (
+        replace(
+            profile,
+            min_discount=profile.min_discount + market.ramp_extra_discount * s,
+            min_roi=profile.min_roi + market.ramp_extra_roi * s,
+            min_daily_sales=profile.min_daily_sales * (1 + (market.ramp_sales_factor - 1) * s),
+            max_flip_share=profile.max_flip_share * (1 - (1 - market.ramp_share_factor) * s),
+        ),
+        True,
+    )
 
 
 def item_allowed(info: ItemInfo | None, profile: Profile) -> tuple[bool, str]:
@@ -190,6 +212,8 @@ class Flip:
     sell_chance: float = 0.0
     volatility: float = 0.0
     score: float = 0.0
+    kind: str = "market"  # market | early (ramp rules) | snapshot (no history)
+    reference: float = 0.0  # snapshot only: median price of the other listings
 
     @property
     def quantity(self) -> int:
@@ -212,6 +236,7 @@ def evaluate_item(
     ok, why = item_allowed(info, profile)
     if not ok:
         return None, why
+    profile, early = ramp_profile(profile, market, m.history_days)
     problems = market_filters(m, listings, market, profile)
     if problems:
         return None, "; ".join(problems)
@@ -278,8 +303,107 @@ def evaluate_item(
         sell_chance=p,
         volatility=m.volatility,
         score=total * min(1.0, m.daily_sales / qty) / (1 + m.volatility),
+        kind="early" if early else "market",
     )
     return flip, ""
+
+
+def evaluate_snapshot(
+    listings: list[Listing],
+    info: ItemInfo | None,
+    market: Market,
+    profile: Profile,
+    bankroll: int,
+) -> tuple[Flip | None, str]:
+    """Judge an item from the current listings alone (no price history).
+
+    Buys the cheapest listings while each is at least snapshot_min_discount
+    below the median unit price of the listings left after buying, and relists
+    just under the cheaper of that median and the next listing up. Sales speed
+    is unknown, so the bankroll share is smaller, the ROI floor higher, and the
+    deposit is charged as if half of relists fail.
+    """
+    if not market.snapshot_flips:
+        return None, "snapshot flips are off"
+    ok, why = item_allowed(info, profile)
+    if not ok:
+        return None, why
+    ordered = sorted(listings, key=lambda l: l.unit_price)
+    deposit = market.deposit_rate * (info.sell_price or 0)
+    p = market.snapshot_sell_chance
+    cut = market.ah_cut
+    max_cost = market.snapshot_flip_share * bankroll
+    total_units = sum(l.quantity for l in ordered)
+
+    def target_for(rest: list[Listing]) -> tuple[float, float]:
+        ref = unit_percentile(rest, 0.5)
+        return (1 - market.undercut) * min(ref, rest[0].unit_price), ref
+
+    def concentrated(rest: list[Listing], ref: float) -> bool:
+        window = [l for l in rest if l.unit_price <= market.price_point_window * ref]
+        units = sum(l.quantity for l in window)
+        by_price: dict[int, int] = {}
+        for l in window:
+            by_price[l.unit_price] = by_price.get(l.unit_price, 0) + l.quantity
+        return bool(units) and max(by_price.values()) / units > market.max_price_point_share
+
+    count = 0
+    reason = "no listing far enough under the rest"
+    for i, l in enumerate(ordered):
+        rest = ordered[i + 1 :]
+        if len(rest) < market.snapshot_min_auctions:
+            reason = f"only {len(ordered)} listings"
+            break
+        t, ref = target_for(rest)
+        qty = sum(x.quantity for x in ordered[: i + 1])
+        cost = sum(x.quantity * x.unit_price for x in ordered[: i + 1])
+        net = net_profit_per_unit(l.unit_price, t, cut, deposit, p)
+        if 1 - l.unit_price / ref < market.snapshot_min_discount:
+            reason = f"cheapest is only {1 - l.unit_price / ref:.0%} under the rest"
+            break
+        if net < profile.min_profit_per_unit or net / l.unit_price < market.snapshot_min_roi:
+            reason = "profit after fees too thin"
+            break
+        if concentrated(rest, ref):
+            reason = "the rest is mostly one price point"
+            break
+        if qty > market.snapshot_max_unit_share * total_units:
+            reason = "would buy too much of the supply"
+            break
+        if cost > max_cost:
+            reason = "over the per-flip bankroll cap"
+            break
+        count = i + 1
+
+    if not count:
+        return None, reason
+
+    chosen, rest = ordered[:count], ordered[count:]
+    t, ref = target_for(rest)
+    buys = [Buy(x.unit_price, x.quantity, net_profit_per_unit(x.unit_price, t, cut, deposit, p)) for x in chosen]
+    qty = sum(b.quantity for b in buys)
+    cost = sum(b.unit_price * b.quantity for b in buys)
+    total = sum(b.net_per_unit * b.quantity for b in buys)
+    if total < profile.min_profit_per_flip:
+        return None, "whole flip under the profit floor"
+    return (
+        Flip(
+            item_id=info.item_id,
+            name=info.name or f"item {info.item_id}",
+            target=t,
+            mv=ref,
+            buys=buys,
+            net_profit=total,
+            cost=cost,
+            roi=total / cost,
+            days_to_sell=float("nan"),
+            sell_chance=p,
+            score=total,
+            kind="snapshot",
+            reference=ref,
+        ),
+        "",
+    )
 
 
 @dataclass
