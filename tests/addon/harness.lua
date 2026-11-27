@@ -228,14 +228,14 @@ commodityResults = { { unitPrice = 1700, quantity = 20, numOwnerItems = 0 } }
 ns.StartList(sellList[1])
 fire("COMMODITY_SEARCH_RESULTS_UPDATED", 2447)
 local body = state().body or ""
-check(body:find("Price each: " .. ns.Money(1699), 1, true), "undercuts the lowest by 1c: " .. body)
+check(body:find("Price each: " .. ns.Money(1700), 1, true), "matches the lowest price (LIFO): " .. body)
 check(body:find("Deposit now: ", 1, true) and body:find("AH cut 5%", 1, true) and body:find("Profit", 1, true),
     "list confirm shows deposit, cut and profit")
 check(body:find("for 24 hours", 1, true) and state().extra == "Length: 24h (change)", "defaults to 24h")
 ns.DialogPress("extra")
 check(state().body:find("for 2 hours", 1, true), "length can be changed to 2h")
 ns.DialogPress("primary")
-check(calls.post and calls.post[2] == 1 and calls.post[3] == 8 and calls.post[4] == 1699, "posts 8 at 1699 for 2h")
+check(calls.post and calls.post[2] == 1 and calls.post[3] == 8 and calls.post[4] == 1700, "posts 8 at 1700 for 2h")
 check(WoWFlipDB.settings.hours == 2, "remembers the length picked")
 fire("AUCTION_HOUSE_AUCTION_CREATED", 99)
 check(WoWFlipDB.bought[2447] == nil, "listed items leave the Sell tab")

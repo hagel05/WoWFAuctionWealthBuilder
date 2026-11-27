@@ -438,10 +438,13 @@ local function ShowListStep()
     local price = p.entry.relist
     local note = ""
     if p.lowest and p.lowest < price then
-        local undercut = math.max(p.lowest - 1, floor)
-        note = "\nLowest listed now: " .. ns.Money(p.lowest) .. ", so priced at " .. ns.Money(undercut) ..
-            (undercut > p.lowest - 1 and " (your break-even; it may sell slowly)" or "")
-        price = undercut
+        -- LIFO: at the same price the newest listing sells first, so matching
+        -- the lowest puts you in front without giving up a copper.
+        local match = math.max(p.lowest, floor)
+        note = "\nLowest listed now: " .. ns.Money(p.lowest) .. ", so priced to match" ..
+            (match > p.lowest and (" your break-even " .. ns.Money(match) .. " (it may sell slowly)") or
+                " (newest at the same price sells first)")
+        price = match
     elseif p.lowest then
         note = "\nLowest listed now: " .. ns.Money(p.lowest)
     end
