@@ -94,11 +94,23 @@ The **WoWFlip** addon shows the flip list in game. When you open the Auction Hou
 - **Market** tab: each flip with what to buy (quantity and the most to pay per unit), what to relist at, and the profit after fees. Hover a row to see the exact listings to buy.
 - **Snapshot** tab: the riskier flips judged from current listings only (tagged "risky"). Hover a row to see what the other listings ask. Early market flips show an "early" tag on the Market tab.
 - **Vendor** tab: listings under what a vendor pays.
-- **Click** a row to search for it in the Auction House, then buy it yourself (addons are not allowed to buy for you). **Right-click** a row to cross it off until the next scan.
+- **Click** a row to search for it in Blizzard's Auction House window. **Right-click** a row to cross it off until the next scan.
 - A cost shown in red means you do not have that much gold on you.
+
+### Buy, collect, list
+
+Blizzard only allows a purchase or a posting from your own click, so each one is a button in a confirm window. Nothing is ever bought or posted without that click.
+
+1. **Buy** (button on each row). The addon checks live prices and plans the purchase within the flip's limits: never above its max price per unit, never more units than the flip, never more than the per-flip share of your bankroll (15% while careful), and never more gold than you have.
+   - Stackable goods (herbs, ore, cloth, potions): the window shows the quantity, price each and estimated total. **Get exact price** asks Blizzard for the final total, and **Buy for <total>** pays it. If the total came back above the flip's limit, the purchase is cancelled and nothing is spent.
+   - Other items: one **Buy for <price>** click per listing, with the running total shown.
+2. **Collect AH mail** (button under the mailbox window). Takes items and gold out of Auction House mail: purchases, sales, and expired or cancelled auctions. It skips cash-on-delivery and ordinary mail.
+3. **List** (the panel's **Sell** tab shows the flips you bought that are now in your bags). The window shows price each, the total, the deposit, the 5% AH cut, what you receive, and your profit compared with what you paid. If someone is already listed lower, it undercuts them by 1 copper, but never below your break-even. **Length** switches between 24h, 2h and 8h, and the deposit updates with it (5%, 20% or 60% of the vendor price). The length you pick is remembered; `/flip length 2|8|24` sets it directly.
+
+   Which length: the deposit is the same per hour (2.5% of the vendor price) and comes back when the item sells, and at the same price the newest listing sells first. So while you are playing, **2h** listings relisted as they expire keep you at the front of the queue for little risk. Before logging off, switch to **8h or 24h** so you stay listed while away.
 - **Item tooltips** everywhere get a line such as "Flip: buy up to 12s each (8), relist at 18s", plus the item's market value and daily sales.
 
-Commands: `/flip` shows or hides the panel, `/flip left` or `/flip right` docks it on that side, `/flip auto` turns opening with the AH on or off, `/flip tooltip` turns the tooltip lines on or off, and `/flip status` says when the data was scanned.
+Commands: `/flip` shows or hides the panel, `/flip left` or `/flip right` docks it on that side, `/flip auto` turns opening with the AH on or off, `/flip tooltip` turns the tooltip lines on or off, `/flip length 2|8|24` sets the default auction length for List, and `/flip status` says when the data was scanned.
 
 ### How the data gets into the game
 

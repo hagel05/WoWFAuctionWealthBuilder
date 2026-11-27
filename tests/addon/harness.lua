@@ -236,10 +236,14 @@ ns.DialogPress("extra")
 check(state().body:find("for 2 hours", 1, true), "length can be changed to 2h")
 ns.DialogPress("primary")
 check(calls.post and calls.post[2] == 1 and calls.post[3] == 8 and calls.post[4] == 1699, "posts 8 at 1699 for 2h")
+check(WoWFlipDB.settings.hours == 2, "remembers the length picked")
 fire("AUCTION_HOUSE_AUCTION_CREATED", 99)
 check(WoWFlipDB.bought[2447] == nil, "listed items leave the Sell tab")
 ns.CloseDialog()
 check(ns.BreakEven(1050, 30 / 8, 0.05) == 1110, "break-even price")
+
+SlashCmdList.WOWFLIP("length 24")
+check(WoWFlipDB.settings.hours == 24, "/flip length 24")
 
 -- Deposit fallback when the game gives no number: 5% / 20% / 60% of vendor price.
 C_AuctionHouse.CalculateCommodityDeposit = nil

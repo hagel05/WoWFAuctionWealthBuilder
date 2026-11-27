@@ -23,8 +23,10 @@ local function Hours()
 end
 
 -- Auction length for the listing being set up (the List window can change it).
+-- Last length picked in the List window (or /flip length), else the scan's.
 local function ListHours()
-    return (pending and pending.hours) or Hours()
+    local saved = WoWFlipDB and WoWFlipDB.settings and WoWFlipDB.settings.hours
+    return (pending and pending.hours) or saved or Hours()
 end
 
 local function Duration()
@@ -465,6 +467,7 @@ local function ShowListStep()
         extra = "Length: " .. hours .. "h (change)", onExtra = function()
             if not pending or pending.stage ~= "list_ready" then return end
             pending.hours = NEXT_HOURS[ListHours()] or 24
+            WoWFlipDB.settings.hours = pending.hours -- remembered for the next listing
             ShowListStep()
         end,
         onPrimary = function()
