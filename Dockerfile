@@ -1,4 +1,4 @@
-# For later: running on a server such as TrueNAS. Mount a volume at /data.
+# Scanner + API for a server such as TrueNAS. Mount a volume at /data.
 FROM python:3.12-slim
 WORKDIR /app
 COPY pyproject.toml README.md ./
@@ -10,4 +10,6 @@ ENV WOWFLIP_DATA_DIR=/data \
     WOWFLIP_CONFIG=/data/config.toml \
     PYTHONUNBUFFERED=1
 VOLUME /data
-CMD ["wowflip", "scan", "--loop", "--now"]
+# API for the sync helpers on your PCs (see README, "In-game addon").
+EXPOSE 8787
+CMD ["wowflip", "serve", "--with-scanner"]

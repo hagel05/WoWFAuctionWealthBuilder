@@ -129,6 +129,8 @@ class ScanResult:
     items_looked_up: int = 0
     items_missing: int = 0
     near_misses: list[tuple[str, str]] = field(default_factory=list)
+    # item_id -> (market value, units sold per day), for the in-game tooltips
+    prices: dict[int, tuple[float, float]] = field(default_factory=dict)
 
 
 def record_snapshot(store: Store, listings: list[Listing], now: int, cfg: Config) -> tuple[bool, int]:
@@ -188,6 +190,8 @@ def score(store: Store, cfg: Config, now: int, listings: list[Listing] | None = 
         )
         if m is None:
             continue
+        if m.history_days >= 1:
+            result.prices[item_id] = (m.mv, m.daily_sales)
         flip, reason = evaluate_item(m, group, info, market, profile, bankroll)
         if flip:
             result.flips.append(flip)

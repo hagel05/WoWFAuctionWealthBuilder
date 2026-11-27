@@ -20,6 +20,23 @@ report_dir = "reports"   # latest.html, latest.csv, flag_log.csv
 override_csv = "items_override.csv"
 max_new_lookups_per_run = 1000
 
+# In-game addon. On the PC where you play, point wow_dir at your WoW folder
+# (the one that contains _forever_). Then every scan also updates the addon,
+# and the gold the addon sees at the Auction House becomes your bankroll.
+[addon]
+# wow_dir = "C:/Program Files (x86)/World of Warcraft"
+# game_folder = "_forever_"
+# sync_url = ""                  # on PCs without the scanner: e.g. "http://truenas.local:8787"
+# sync_minutes = 5               # how often the sync helper checks for a new scan
+# bankroll_from_game = true
+# bankroll_characters = []       # e.g. ["Matt - Dreamscythe"]; empty = last character at the AH
+
+# API for sync helpers on other PCs (`wowflip serve`). Set WOWFLIP_API_TOKEN
+# in the environment on the server and on each PC to require a shared secret.
+[server]
+# host = "0.0.0.0"
+# port = 8787
+
 # Market-wide rules. Values are first guesses from the scoring rules doc.
 [market]
 # history_days = 14

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Lua 5.1 (runs the addon tests)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
+      - run: pip install ".[dev]"
+      - run: pytest -q
+
+  sync-exe:
+    # Windows build of the sync helper, downloadable from the run's Artifacts.
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: powershell -ExecutionPolicy Bypass -File scripts\build_sync_exe.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WoWFlipSync
+          path: |
+            dist/WoWFlipSync.exe
+            config.example.toml
+            scripts/install_sync_task.ps1
+            scripts/install_addon.ps1
+            addon/
