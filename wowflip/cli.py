@@ -113,11 +113,16 @@ def cmd_check(cfg: Config, args) -> int:
         print(f"House {cfg.house_id}: {len(auctions):,} item auctions")
         if cfg.include_commodities:
             print(f"House {cfg.house_id} commodities: {len(client.commodities(cfg.ruleset_id, cfg.house_id)):,}")
-        if auctions:
-            item_id = auctions[0]["item"]["id"]
-            info = parse_item(item_id, client.item(item_id))
-            print(f"Sample item {item_id}: {info}")
-            print("sell_price present:", info.sell_price is not None)
+        ids = sorted({a["item"]["id"] for a in auctions})
+        sample = ids[:: max(1, len(ids) // 20)][:20]
+        if sample:
+            infos = [parse_item(i, client.item(i)) for i in sample]
+            found = [i for i in infos if i.status == "ok"]
+            priced = [i for i in found if i.sell_price is not None]
+            print(f"Item details: {len(found)} of {len(infos)} sampled items found, "
+                  f"{len(priced)} with a vendor sell price.")
+            for i in found[:5]:
+                print(f"  {i.item_id} {i.name} ({i.class_name}), sell price {i.sell_price}, binding {i.binding}")
     except ApiError as exc:
         print(f"\nFailed: {exc}")
         return 2

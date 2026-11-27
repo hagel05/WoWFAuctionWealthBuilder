@@ -207,6 +207,8 @@ def run_scan(client, store: Store, cfg: Config, now: int | None = None) -> ScanR
     listings = normalize(raw, commodity=False)
     if cfg.include_commodities:
         listings += normalize(client.commodities(cfg.ruleset_id, cfg.house_id), commodity=True)
+    # Guard against the same auction appearing in both feeds.
+    listings = list({l.auction_id: l for l in listings}.values())
     log.info("Fetched %d listings from house %d.", len(listings), cfg.house_id)
 
     changed, sales = record_snapshot(store, listings, now, cfg)
