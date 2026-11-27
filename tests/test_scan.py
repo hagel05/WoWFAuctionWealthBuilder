@@ -49,7 +49,8 @@ class FakeClient:
         self._list(ORE, 5, None)
         if deal:
             self._list(HERB, 2, 12_000)  # 1.20g each, about 40% under market
-            self._list(JUNK, 3, 5)  # below its vendor price
+            self._list(JUNK, 20, 5)  # below its vendor price (19s profit)
+            self._list(JUNK, 1, 99)  # also below, but worth only 1c
 
     # API surface used by the scanner
     def auctions(self, ruleset, house):

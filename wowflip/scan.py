@@ -179,7 +179,7 @@ def score(store: Store, cfg: Config, now: int, listings: list[Listing] | None = 
     misses = []
     for item_id, group in group_by_item(listings).items():
         info = items.get(item_id)
-        result.vendor.extend(vendor_flips(group, info))
+        result.vendor.extend(vendor_flips(group, info, market.min_vendor_profit, bankroll))
         history = store.item_history(item_id, since)
         if not history:
             continue

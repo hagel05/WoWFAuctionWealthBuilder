@@ -90,6 +90,7 @@ class Market:
     crash_ratio: float = 0.85  # skip if MV3 < 0.85 * MV
     reset_rise: float = 0.50  # skip if min buyout rose > 50% in 24h ...
     reset_supply_drop: float = 0.50  # ... while units listed fell by more than half
+    min_vendor_profit: int = 10 * SILVER  # skip vendor flips worth less than this per item
     balanced_at_gold: float = 200
     keep_days: float = 30  # prune history older than this
 
