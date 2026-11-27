@@ -29,6 +29,15 @@ def _buys_text(flip) -> str:
     return ", ".join(f"{b.quantity} @ {money(b.unit_price)}" for b in flip.buys)
 
 
+def _kind(flip) -> str:
+    return {"market": "flip"}.get(flip.kind, flip.kind)
+
+
+def _days(flip, digits: int = 1):
+    d = flip.days_to_sell
+    return "" if d != d else round(d, digits)  # NaN: unknown (snapshot flips)
+
+
 def write_reports(result: ScanResult, cfg: Config) -> Path:
     out = cfg.report_dir
     out.mkdir(parents=True, exist_ok=True)
@@ -39,10 +48,10 @@ def write_reports(result: ScanResult, cfg: Config) -> Path:
         w = csv.writer(fh)
         w.writerow(["kind", "item_id", "item", "buy_listings", "quantity", "cost_copper",
                     "relist_at_copper", "net_profit_copper", "roi", "days_to_sell", "score"])
-        for f in result.flips:
-            w.writerow(["flip", f.item_id, f.name, _buys_text(f), f.quantity, f.cost,
+        for f in result.flips + result.snapshots:
+            w.writerow([_kind(f), f.item_id, f.name, _buys_text(f), f.quantity, f.cost,
                         round(f.target), round(f.net_profit), round(f.roi, 3),
-                        round(f.days_to_sell, 2), round(f.score)])
+                        _days(f, 2), round(f.score)])
         for v in result.vendor:
             w.writerow(["vendor", v.item_id, v.name, f"{v.listings} listings up to {money(v.unit_price)}", v.quantity,
                         v.cost, v.sell_price, v.profit, round(v.profit / v.cost, 3) if v.cost else "", "", ""])
@@ -55,8 +64,8 @@ def write_reports(result: ScanResult, cfg: Config) -> Path:
         if new:
             w.writerow(["scanned_at", "kind", "item_id", "item", "quantity", "max_buy_copper",
                         "relist_at_copper", "net_profit_copper", "profile"])
-        for f in result.flips:
-            w.writerow([stamp, "flip", f.item_id, f.name, f.quantity, f.max_price,
+        for f in result.flips + result.snapshots:
+            w.writerow([stamp, _kind(f), f.item_id, f.name, f.quantity, f.max_price,
                         round(f.target), round(f.net_profit), result.profile])
         for v in result.vendor:
             w.writerow([stamp, "vendor", v.item_id, v.name, v.quantity, v.unit_price,
@@ -72,7 +81,9 @@ def render_html(result: ScanResult, cfg: Config, stamp: str) -> str:
     if result.history_days < cfg.market.min_history_days:
         notes.append(
             f"Collecting price history: {result.history_days:.1f} of {cfg.market.min_history_days:.0f} days so far. "
-            "Market flips appear once items have a week of history; vendor flips work from day one."
+            f"Market flips start after {cfg.market.ramp_start_days:g} days with stricter rules (marked early) "
+            "and use the normal rules after a week. Until then, snapshot flips judge items from the current "
+            "listings alone."
         )
     if not result.changed:
         notes.append("The auction data had not changed since the last scan, so this report reuses it.")
@@ -86,10 +97,11 @@ def render_html(result: ScanResult, cfg: Config, stamp: str) -> str:
     for i, f in enumerate(result.flips, 1):
         rows.append(
             "<tr>"
-            f"<td class=num>{i}</td><td>{e(f.name)}</td><td>{e(_buys_text(f))}</td>"
+            f"<td class=num>{i}</td><td>{e(f.name)}{' <small>(early)</small>' if f.kind == 'early' else ''}</td>"
+            f"<td>{e(_buys_text(f))}</td>"
             f"<td class=num>{money(f.cost)}</td><td class=num>{money(f.target)}</td>"
             f"<td class=num>{money(f.net_profit)}</td><td class=num>{f.roi:.0%}</td>"
-            f"<td class=num>{f.days_to_sell:.1f}</td><td class=num>{money(f.score)}</td>"
+            f"<td class=num>{_days(f)}</td><td class=num>{money(f.score)}</td>"
             "</tr>"
         )
     flips_html = (
@@ -98,6 +110,23 @@ def render_html(result: ScanResult, cfg: Config, stamp: str) -> str:
         "<th class=num>ROI</th><th class=num>Days to sell</th><th class=num>Score</th></tr>"
         + "".join(rows) + "</table></div>"
         if rows else "<p>No market flips pass the rules this hour.</p>"
+    )
+
+    srows = [
+        "<tr>"
+        f"<td class=num>{i}</td><td>{e(f.name)}</td><td>{e(_buys_text(f))}</td>"
+        f"<td class=num>{money(f.reference)}</td><td class=num>{money(f.cost)}</td>"
+        f"<td class=num>{money(f.target)}</td><td class=num>{money(f.net_profit)}</td>"
+        f"<td class=num>{f.roi:.0%}</td></tr>"
+        for i, f in enumerate(result.snapshots[:50], 1)
+    ]
+    snap_html = (
+        "<p>Riskier: priced against the other listings right now, with no sales history, so how fast "
+        "these sell is unknown. Limits are tighter (10% of bankroll per flip, 30% ROI floor).</p>"
+        "<div class=wrap><table><tr><th class=num>#</th><th>Item</th><th>Buy these listings (qty @ unit price)</th>"
+        "<th class=num>Others listed at</th><th class=num>Cost</th><th class=num>Relist at (each)</th>"
+        "<th class=num>Net profit</th><th class=num>ROI</th></tr>" + "".join(srows) + "</table></div>"
+        if srows else "<p>None this hour.</p>"
     )
 
     vrows = [
@@ -130,6 +159,8 @@ bankroll {money(result.bankroll)} ({e(result.profile)} profile)</div>
 <h2>Market flips (buy, then relist on the AH for 24 hours)</h2>
 {flips_html}
 {miss_html}
+<h2>Snapshot flips (riskier, no price history yet)</h2>
+{snap_html}
 </body></html>
 """
 
@@ -137,11 +168,15 @@ bankroll {money(result.bankroll)} ({e(result.profile)} profile)</div>
 def print_summary(result: ScanResult, report_path: Path) -> None:
     print(
         f"Scan done: {result.listings:,} listings, {len(result.flips)} market flips, "
+        f"{len(result.snapshots)} snapshot flips, "
         f"{len(result.vendor)} vendor flips, {result.history_days:.1f} days of history, "
         f"bankroll {money(result.bankroll)} ({result.profile})."
     )
     for f in result.flips[:10]:
-        print(f"  {f.name}: buy {_buys_text(f)}, relist at {money(f.target)}, profit {money(f.net_profit)}")
+        print(f"  {f.name}{' (early)' if f.kind == 'early' else ''}: buy {_buys_text(f)}, relist at {money(f.target)}, profit {money(f.net_profit)}")
+    for f in result.snapshots[:5]:
+        print(f"  [snapshot] {f.name}: buy {_buys_text(f)}, relist at {money(f.target)}, "
+              f"profit {money(f.net_profit)} (riskier)")
     for v in result.vendor[:5]:
         print(f"  [vendor] {v.name}: {v.quantity} up to {money(v.unit_price)} each, profit {money(v.profit)}")
     print(f"Report: {report_path.resolve()}")

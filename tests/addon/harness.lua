@@ -95,6 +95,15 @@ ns.SearchAH(flip)
 check(searched == flip.name, "click searches the AH by name")
 ns.ToggleDone(flip.item_id)
 check(#ns.PanelList() == n - 1, "right-click crosses a row off")
+-- Snapshot (riskier) flips: own tab, tooltip lines, no days-to-sell needed.
+local snap = ns.feed.snapshot[1]
+check(snap and snap.kind == "snapshot" and snap.days_to_sell == nil, "feed has a snapshot flip")
+local slines = ns.TooltipLines(snap.item_id)
+check(#slines == 2 and slines[1]:find("Snapshot flip"), "snapshot tooltip lines")
+WoWFlipDB.settings.tab = "snapshot"
+check(#ns.PanelList() == #ns.feed.snapshot, "snapshot tab lists snapshot flips")
+ns.RefreshPanel()
+check(WoWFlipPanel.status._text:find("snapshot"), "status names snapshot flips: " .. tostring(WoWFlipPanel.status._text))
 WoWFlipDB.settings.tab = "vendor"
 check(#ns.PanelList() == #ns.feed.vendor, "vendor tab lists vendor flips")
 ns.RefreshPanel()

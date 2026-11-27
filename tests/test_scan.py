@@ -115,3 +115,19 @@ def test_end_to_end(tmp_path):
     text = path.read_text()
     assert "Peacebloom" in text and "Junk" in text
     store.close()
+
+
+def test_snapshot_flips_on_the_first_scan(tmp_path):
+    cfg = Config(data_dir=tmp_path / "data", report_dir=tmp_path / "reports",
+                 item_override_csv=tmp_path / "none.csv", bankroll_gold=30)
+    store = Store(cfg.db_path)
+    client = FakeClient()
+    client.tick(deal=True)
+    result = run_scan(client, store, cfg, now=1_800_000_000)
+    assert result.flips == []  # no history yet
+    assert [f.name for f in result.snapshots] == ["Peacebloom"]
+    assert result.snapshots[0].quantity == 2 and result.snapshots[0].kind == "snapshot"
+
+    from wowflip.report import write_reports
+    assert "Snapshot flips" in write_reports(result, cfg).read_text()
+    store.close()

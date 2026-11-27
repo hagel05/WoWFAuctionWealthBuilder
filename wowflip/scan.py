@@ -14,6 +14,7 @@ from wowflip.scoring import (
     VendorFlip,
     build_market_stats,
     evaluate_item,
+    evaluate_snapshot,
     vendor_flips,
 )
 from wowflip.stats import fingerprint, group_by_item, infer_sales, summarize
@@ -126,6 +127,8 @@ class ScanResult:
     profile: str
     flips: list[Flip] = field(default_factory=list)
     vendor: list[VendorFlip] = field(default_factory=list)
+    # Riskier flips judged from the current listings only (items without history).
+    snapshots: list[Flip] = field(default_factory=list)
     items_looked_up: int = 0
     items_missing: int = 0
     near_misses: list[tuple[str, str]] = field(default_factory=list)
@@ -183,15 +186,19 @@ def score(store: Store, cfg: Config, now: int, listings: list[Listing] | None = 
         info = items.get(item_id)
         result.vendor.extend(vendor_flips(group, info, market.min_vendor_profit, bankroll))
         history = store.item_history(item_id, since)
-        if not history:
-            continue
-        m = build_market_stats(
-            item_id, history, store.item_sales(item_id, since), now, snaps, coverage, market
-        )
-        if m is None:
-            continue
-        if m.history_days >= 1:
+        m = None
+        if history:
+            m = build_market_stats(
+                item_id, history, store.item_sales(item_id, since), now, snaps, coverage, market
+            )
+        if m is not None and m.history_days >= 1:
             result.prices[item_id] = (m.mv, m.daily_sales)
+        if m is None or m.history_days < market.ramp_start_days:
+            # Too little history for market rules: judge from current listings only.
+            snap, _ = evaluate_snapshot(group, info, market, profile, bankroll)
+            if snap:
+                result.snapshots.append(snap)
+            continue
         flip, reason = evaluate_item(m, group, info, market, profile, bankroll)
         if flip:
             result.flips.append(flip)
@@ -200,6 +207,7 @@ def score(store: Store, cfg: Config, now: int, listings: list[Listing] | None = 
 
     result.flips.sort(key=lambda f: f.score, reverse=True)
     result.vendor.sort(key=lambda v: v.profit, reverse=True)
+    result.snapshots.sort(key=lambda f: f.score, reverse=True)
     misses.sort(reverse=True)
     result.near_misses = [(name, reason) for _, name, reason in misses[:15]]
     return result

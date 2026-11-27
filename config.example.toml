@@ -52,6 +52,17 @@ max_new_lookups_per_run = 1000
 # max_price_point_share = 0.60
 # crash_ratio = 0.85
 # min_vendor_profit = 1000   # 10 silver; vendor flips worth less are hidden
+# ramp_start_days = 2          # early market flips from this much history, with stricter rules
+# ramp_extra_discount = 0.15   # extra discount needed at the start of the ramp
+# ramp_extra_roi = 0.15
+# ramp_sales_factor = 2.0      # need this many times the daily sales at the start
+# ramp_share_factor = 0.5      # and only this share of the per-flip bankroll cap
+# snapshot_flips = true        # riskier flips from current listings while an item has no history
+# snapshot_min_discount = 0.30
+# snapshot_min_roi = 0.30
+# snapshot_min_auctions = 8
+# snapshot_flip_share = 0.10
+# snapshot_max_unit_share = 0.25
 # balanced_at_gold = 200      # switch from careful to balanced above this bankroll
 
 # Buy rules while bankroll is under balanced_at_gold. Money is in copper

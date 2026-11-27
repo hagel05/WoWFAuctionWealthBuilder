@@ -63,7 +63,7 @@ def test_bankroll_cap_blocks_big_flip():
 @pytest.mark.parametrize(
     "change, expect",
     [
-        (dict(history_days=3), "history"),
+        (dict(history_days=1.5), "history"),
         (dict(daily_sales=2), "sells"),
         (dict(mv3=1.5 * GOLD), "falling"),
         (dict(p20=1.0 * GOLD, p80=2.5 * GOLD), "volatile"),
@@ -103,3 +103,54 @@ def test_vendor_flips_grouped_with_floor_and_budget():
     assert vendor_flips(ls, info, min_profit=1000) == []
     [v] = vendor_flips(ls, info, min_profit=0, budget=700)
     assert v.quantity == 10
+
+
+def test_ramp_is_stricter_early_and_relaxes():
+    from wowflip.scoring import ramp_profile
+
+    m = Market()
+    p2, early2 = ramp_profile(CAREFUL, m, 2)
+    assert early2 and p2.min_discount == pytest.approx(0.45) and p2.max_flip_share == pytest.approx(0.075)
+    assert p2.min_daily_sales == pytest.approx(10)
+    p7, early7 = ramp_profile(CAREFUL, m, 7)
+    assert not early7 and p7 == CAREFUL
+    # Day 3: the 40% deal is not cheap enough yet. Day 6: it passes, marked early.
+    flip, reason = evaluate_item(herb_market(history_days=3), herb_listings(), HERB, Market(), CAREFUL, 30 * GOLD)
+    assert flip is None and "discount" in reason
+    flip, reason = evaluate_item(herb_market(history_days=6), herb_listings(), HERB, Market(), CAREFUL, 30 * GOLD)
+    assert flip is not None and flip.kind == "early", reason
+    flip, _ = evaluate_item(herb_market(), herb_listings(), HERB, Market(), CAREFUL, 30 * GOLD)
+    assert flip.kind == "market"
+
+
+def deep_market(cheap):
+    """10 listings of 1 unit around 2g, plus the given cheap listings."""
+    rest = [Listing(500 + i, 1, 1, 20_000 + 100 * i, "LONG") for i in range(10)]
+    return list(cheap) + rest
+
+
+def test_snapshot_flip_from_one_scan():
+    from wowflip.scoring import evaluate_snapshot
+
+    flip, reason = evaluate_snapshot(deep_market([Listing(1, 1, 2, 11_000, "LONG")]), HERB, Market(), CAREFUL, 30 * GOLD)
+    assert flip is not None, reason
+    assert flip.kind == "snapshot" and flip.quantity == 2
+    assert flip.reference == 20_400  # median of the other listings
+    assert flip.target == pytest.approx(0.97 * 20_000)  # just under the next listing up
+    assert flip.cost <= 0.10 * 30 * GOLD
+
+
+@pytest.mark.parametrize(
+    "listings, expect",
+    [
+        (deep_market([Listing(1, 1, 1, 16_000, "LONG")]), "under the rest"),  # only 22% off
+        ([Listing(1, 1, 1, 10_000, "LONG")] + deep_market([])[:5], "listings"),  # thin market
+        (deep_market([Listing(1, 1, 3, 11_000, "LONG")]) + [Listing(99, 1, 40, 20_000, "LONG")], "price point"),
+        (deep_market([Listing(1, 1, 4, 11_000, "LONG")]), "supply"),  # 4 of 14 units
+    ],
+)
+def test_snapshot_rejections(listings, expect):
+    from wowflip.scoring import evaluate_snapshot
+
+    flip, reason = evaluate_snapshot(listings, HERB, Market(), CAREFUL, 30 * GOLD)
+    assert flip is None and expect in reason

@@ -26,10 +26,13 @@ def sample_result(taken_at=1_800_000_000):
     flip = Flip(item_id=2447, name='Peacebloom "fresh"', target=1800, mv=2000,
                 buys=[Buy(1000, 5, 600.0), Buy(1100, 3, 500.0)], net_profit=4500, cost=8300,
                 roi=0.54, days_to_sell=1.23)
+    snap = Flip(item_id=2589, name="Linen Cloth", target=95, mv=100, buys=[Buy(50, 20, 35.0)],
+                net_profit=700, cost=1000, roi=0.7, days_to_sell=float("nan"), kind="snapshot", reference=100)
     return ScanResult(
         taken_at=taken_at, changed=True, listings=100, sales_found=3, history_days=8.2,
         bankroll=30 * GOLD, profile="careful", flips=[flip],
-        vendor=[VendorFlip(2770, "Copper Ore", 40, 5, 50), VendorFlip(2770, "Copper Ore", 45, 2, 50)],
+        vendor=[VendorFlip(2770, "Copper Ore", 40, 5, 50, cost=200), VendorFlip(2770, "Copper Ore", 45, 2, 50, cost=90)],
+        snapshots=[snap],
         prices={2447: (2000.4, 12.34), 2770: (60.0, 40.0)},
     )
 
@@ -56,6 +59,11 @@ def test_feed_shape():
     f = feed["flips"][0]
     assert (f["buy_max"], f["quantity"], f["relist"], f["profit"]) == (1100, 8, 1800, 4500)
     assert f["buys"] == [[1000, 5], [1100, 3]]
+    s = feed["snapshot"][0]
+    assert (s["kind"], s["reference"], s["relist"]) == ("snapshot", 100, 95)
+    assert "days_to_sell" not in s
+    assert feed["flips"][0]["kind"] == "market"
+    json.dumps(feed, allow_nan=False)  # NaN must never reach the feed
     v = feed["vendor"][0]
     assert (v["quantity"], v["buy_max"], v["profit"]) == (7, 49, 60)
     assert feed["prices"]["2447"] == [2000, 12.3]

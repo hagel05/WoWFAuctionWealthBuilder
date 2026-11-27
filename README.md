@@ -14,7 +14,13 @@ It is set up for **US, Normal ruleset, Alliance** (house 111), at 20 minutes pas
 
 `reports/latest.csv` holds the same list, and `reports/flag_log.csv` keeps every flag ever raised so the rules can be tuned later.
 
-**Market flips need about a week of history first.** The scanner compares each listing with the item's 14-day price history and only trusts items with at least 7 days of it. Vendor flips work from the first scan.
+**You get flips from the first scan, and they get safer as history builds:**
+
+| History | What you get |
+| --- | --- |
+| From the first scan | **Vendor flips**, and **snapshot flips** (riskier): an item whose cheapest listings are at least 30% under the median of its other listings. There is no sales history yet, so these use a smaller bankroll share (10% per flip), a 30% ROI floor, need 8+ other listings and never buy more than a quarter of the supply. |
+| From day 2 | **Early market flips**, marked "early": the normal rules, but stricter. At day 2 the discount and ROI floors are 15 points higher, the item must sell twice as often, and a flip may use only half the usual share of bankroll. These ease off day by day. |
+| From day 7 | **Market flips** on the normal rules below. Snapshot flips continue only for items with under 2 days of history, such as ones newly listed. |
 
 ## Setup on Windows
 
@@ -86,6 +92,7 @@ Missed hours are fine. They leave gaps in the history, and the scanner only coun
 The **WoWFlip** addon shows the flip list in game. When you open the Auction House, a **Flips** panel docks beside it:
 
 - **Market** tab: each flip with what to buy (quantity and the most to pay per unit), what to relist at, and the profit after fees. Hover a row to see the exact listings to buy.
+- **Snapshot** tab: the riskier flips judged from current listings only (tagged "risky"). Hover a row to see what the other listings ask. Early market flips show an "early" tag on the Market tab.
 - **Vendor** tab: listings under what a vendor pays.
 - **Click** a row to search for it in the Auction House, then buy it yourself (addons are not allowed to buy for you). **Right-click** a row to cross it off until the next scan.
 - A cost shown in red means you do not have that much gold on you.
@@ -170,6 +177,8 @@ The rules follow the "Flip scoring rules" doc. In short, per unit, with B = buy 
 - **Buy** when the discount is at least 30%, profit is at least 10s per unit and 50s per flip, ROI is at least 25%, the item sells 5 or more a day near MV, it should sell within 2 days, and the flip costs at most 15% of your bankroll.
 - **Skip** items with under 7 days of history, fewer than 5 auctions, one price point holding over 60% of the supply, a falling price (MV3 under 85% of MV), a sudden buyout and price jump, or prices that swing too much.
 - **Rank** by net profit × quantity × min(1, daily sales ÷ quantity) ÷ (1 + volatility), roughly gold per day.
+
+The early and snapshot rules are under `[market]` in `config.toml` (`ramp_start_days`, `ramp_extra_discount`, `snapshot_flips = false` to turn snapshot flips off, and so on).
 
 Every threshold is a first guess and can be changed in `config.toml`. After a few weeks, compare `reports/flag_log.csv` with what actually sold and tune them.
 
