@@ -62,6 +62,11 @@ def build_feed(result: ScanResult, cfg: Config) -> dict:
         "bankroll": int(result.bankroll),
         "history_days": round(result.history_days, 1),
         "listing_hours": cfg.market.listing_hours,
+        "ah_cut": cfg.market.ah_cut,
+        "deposit_rate": cfg.market.deposit_rate,
+        # Most one flip may cost (bankroll share for this profile); the addon's
+        # Buy button never spends more than this per item.
+        "max_flip_cost": int(cfg.profile_for(result.bankroll).max_flip_share * result.bankroll),
         "flips": flips,
         # Riskier flips judged from current listings only (items with no history yet).
         "snapshot": snapshot,

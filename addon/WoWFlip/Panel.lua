@@ -1,8 +1,9 @@
 -- WoWFlip: the Flips panel docked beside the Auction House window.
 --
 -- Built from plain frames and font strings (no Blizzard scroll templates), so
--- it does not depend on Auction House internals that may change. Buying is
--- always done by the player in Blizzard's window: addons cannot buy for you.
+-- it does not depend on Auction House internals that may change. Each row has a
+-- Buy (or, on the Sell tab, List) button that opens a confirm window; the
+-- player's click there is what spends gold (see Trade.lua).
 local ADDON, ns = ...
 
 local ROWS, ROW_H, WIDTH = 12, 34, 300
@@ -11,6 +12,7 @@ local panel, rows, offset = nil, {}, 0
 local function List()
     if not ns.feed then return {} end
     local tab = WoWFlipDB.settings.tab
+    if tab == "sell" then return ns.SellList and ns.SellList() or {} end
     local src = (tab == "vendor" and ns.feed.vendor) or (tab == "snapshot" and ns.feed.snapshot) or ns.feed.flips
     local out = {}
     for _, entry in ipairs(src) do
@@ -48,7 +50,11 @@ local TAGS = { early = "  |cffffd040early|r", snapshot = "  |cffffa040risky|r" }
 local function RowText(entry)
     local market = WoWFlipDB.settings.tab ~= "vendor"
     local line1, line2
-    if market then
+    if entry.sell then
+        line1 = entry.name .. "  x" .. entry.quantity .. " in bags"
+        line2 = "Paid " .. ns.Money(entry.paid_each) .. " each, list at ~" .. ns.Money(entry.relist)
+        return line1, line2
+    elseif market then
         line1 = entry.name .. "  |cff40ff40+" .. ns.Money(entry.profit, true) .. "|r" .. (TAGS[entry.kind] or "")
         line2 = "Buy " .. entry.quantity .. " up to " .. ns.Money(entry.buy_max) .. ", relist " .. ns.Money(entry.relist)
     else
@@ -71,7 +77,9 @@ function ns.RefreshPanel()
     panel.marketTab:SetEnabled(tab ~= "market")
     panel.snapshotTab:SetEnabled(tab ~= "snapshot")
     panel.vendorTab:SetEnabled(tab ~= "vendor")
-    local noun = (tab == "vendor" and " vendor flips") or (tab == "snapshot" and " snapshot flips (riskier)") or " flips"
+    panel.sellTab:SetEnabled(tab ~= "sell")
+    local noun = (tab == "vendor" and " vendor flips") or (tab == "snapshot" and " snapshot flips (riskier)") or
+        (tab == "sell" and " to list") or " flips"
 
     if not ns.feed then
         panel.status:SetText("No flip data yet. Run the sync helper, then /reload.")
@@ -91,12 +99,15 @@ function ns.RefreshPanel()
             local l1, l2 = RowText(entry)
             row.line1:SetText(l1)
             row.line2:SetText(l2)
+            row.action:SetText(entry.sell and "List" or "Buy")
             row:Show()
         else
             row:Hide()
         end
     end
-    panel.empty:SetShown(ns.feed ~= nil and #list == 0)
+    panel.empty:SetText(tab == "sell" and "Nothing to list. Buy flips here, then collect them from the mailbox."
+        or "Nothing passes the rules this hour.")
+    panel.empty:SetShown((ns.feed ~= nil or tab == "sell") and #list == 0)
 end
 
 function ns.AnchorPanel()
@@ -132,8 +143,13 @@ local function OnRowEnter(row)
     else
         GameTooltip:SetText(row.entry.name)
     end
-    GameTooltip:AddLine("Click: search the Auction House", 0.6, 0.8, 1)
-    GameTooltip:AddLine("Right-click: cross off until the next scan", 0.6, 0.8, 1)
+    if row.entry.sell then
+        GameTooltip:AddLine("List: shows price, deposit, AH cut and profit, then posts on your click", 0.6, 0.8, 1, true)
+    else
+        GameTooltip:AddLine("Buy: checks live prices and shows the exact total before you pay", 0.6, 0.8, 1, true)
+        GameTooltip:AddLine("Click: search the Auction House", 0.6, 0.8, 1)
+        GameTooltip:AddLine("Right-click: cross off until the next scan", 0.6, 0.8, 1)
+    end
     if row.entry.kind == "snapshot" then
         GameTooltip:AddLine("Riskier: priced against the other listings (" .. ns.Money(row.entry.reference) ..
             ") with no sales history, so it may sell slowly.", 1, 0.63, 0.25, true)
@@ -184,7 +200,7 @@ local function Build()
 
     local function Tab(label, key, x)
         local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-        b:SetSize(80, 20)
+        b:SetSize(68, 20)
         b:SetPoint("TOPLEFT", x, -34)
         b:SetText(label)
         b:SetScript("OnClick", function()
@@ -195,8 +211,9 @@ local function Build()
         return b
     end
     panel.marketTab = Tab("Market", "market", 10)
-    panel.snapshotTab = Tab("Snapshot", "snapshot", 94)
-    panel.vendorTab = Tab("Vendor", "vendor", 178)
+    panel.snapshotTab = Tab("Snapshot", "snapshot", 80)
+    panel.vendorTab = Tab("Vendor", "vendor", 150)
+    panel.sellTab = Tab("Sell", "sell", 220)
 
     panel.status = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     panel.status:SetPoint("TOPLEFT", 12, -58)
@@ -217,12 +234,21 @@ local function Build()
         hl:SetColorTexture(1, 1, 1, 0.08)
         row.line1 = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         row.line1:SetPoint("TOPLEFT", 2, -2)
-        row.line1:SetWidth(WIDTH - 24)
+        row.line1:SetWidth(WIDTH - 78)
         row.line1:SetJustifyH("LEFT")
         row.line2 = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         row.line2:SetPoint("TOPLEFT", row.line1, "BOTTOMLEFT", 0, -2)
-        row.line2:SetWidth(WIDTH - 24)
+        row.line2:SetWidth(WIDTH - 78)
         row.line2:SetJustifyH("LEFT")
+        row.action = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        row.action:SetSize(50, 20)
+        row.action:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+        row.action:SetText("Buy")
+        row.action:SetScript("OnClick", function()
+            local entry = row.entry
+            if not entry then return end
+            if entry.sell then ns.StartList(entry) else ns.StartBuy(entry) end
+        end)
         row:SetScript("OnClick", OnRowClick)
         row:SetScript("OnEnter", OnRowEnter)
         row:SetScript("OnLeave", OnRowLeave)

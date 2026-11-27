@@ -70,11 +70,15 @@ local function InitDB()
     db.done = type(db.done) == "table" and db.done or {}
     db.done.items = type(db.done.items) == "table" and db.done.items or {}
     db.settings = type(db.settings) == "table" and db.settings or {}
+    -- Flip items bought through the panel, so the Sell tab knows what to list
+    -- and what they cost: [itemID] = { qty, cost, relist, name, at }
+    db.bought = type(db.bought) == "table" and db.bought or {}
     local s = db.settings
     if s.panel == nil then s.panel = true end -- show the panel with the AH
     if s.tooltip == nil then s.tooltip = true end
     if s.side ~= "left" then s.side = "right" end
-    if s.tab ~= "vendor" and s.tab ~= "snapshot" then s.tab = "market" end
+    if s.tab ~= "vendor" and s.tab ~= "snapshot" and s.tab ~= "sell" then s.tab = "market" end
+    if s.hours ~= 2 and s.hours ~= 8 and s.hours ~= 24 then s.hours = nil end -- listing length
 end
 
 local events = CreateFrame("Frame")
@@ -127,6 +131,14 @@ SlashCmdList["WOWFLIP"] = function(msg)
         s.side = msg
         if ns.AnchorPanel then ns.AnchorPanel() end
         ns.Print("Panel docks on the " .. msg .. " of the Auction House.")
+    elseif msg:match("^length") then
+        local h = tonumber(msg:match("(%d+)"))
+        if h == 2 or h == 8 or h == 24 then
+            s.hours = h
+            ns.Print("New listings default to " .. h .. " hours.")
+        else
+            ns.Print("Usage: /flip length 2 | 8 | 24  (now " .. tostring(s.hours or "the scan's default") .. ")")
+        end
     elseif msg == "tooltip" then
         s.tooltip = not s.tooltip
         ns.Print("Tooltip lines: " .. (s.tooltip and "on" or "off"))
@@ -144,6 +156,7 @@ SlashCmdList["WOWFLIP"] = function(msg)
         ns.Print("/flip left | right  dock the panel on that side of the AH")
         ns.Print("/flip auto  open the panel with the AH (on/off)")
         ns.Print("/flip tooltip  flip prices on tooltips (on/off)")
+        ns.Print("/flip length 2 | 8 | 24  default auction length for List")
         ns.Print("/flip status  when the data was scanned")
     end
 end
