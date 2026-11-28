@@ -96,7 +96,7 @@ function ns.RefreshPanel()
         (tab == "sell" and " to list") or " flips"
 
     if not ns.feed then
-        panel.status:SetText("No flip data yet. Run the sync helper, then /reload.")
+        panel.status:SetText("|cffff6060No flip data loaded.|r " .. (ns.dataProblem or "Run a scan, then /reload."))
     else
         local age = ns.Ago(ns.FeedAge())
         local text = "Scanned " .. age .. "  ·  " .. #list .. noun
