@@ -30,13 +30,31 @@ Data.lua
 """
 
 
+def find_game_root(wow_dir: Path | str, game_folder: str = "_forever_") -> Path | None:
+    """The `_forever_` folder for a wow_dir that may point at it or anywhere inside it.
+
+    Accepts the World of Warcraft folder (the documented setting), the
+    `_forever_` folder itself, or a folder under it such as Interface/AddOns.
+    """
+    path = Path(wow_dir)
+    if (path / game_folder).is_dir():
+        return path / game_folder
+    for candidate in (path, *path.parents):
+        if candidate.name.lower() == game_folder.lower() and candidate.is_dir():
+            return candidate
+    return None
+
+
 class WowInstall:
     def __init__(self, wow_dir: Path | str, game_folder: str = "_forever_"):
-        self.root = Path(wow_dir) / game_folder
-        if not self.root.is_dir():
+        root = find_game_root(wow_dir, game_folder)
+        if root is None:
             raise FileNotFoundError(
-                f"{self.root} not found. Set [addon] wow_dir to the folder that holds {game_folder}."
+                f"No {game_folder} folder found at {wow_dir}. Set [addon] wow_dir in config.toml to the "
+                f"World of Warcraft folder that contains {game_folder}, "
+                'e.g. wow_dir = "C:/Program Files (x86)/World of Warcraft".'
             )
+        self.root = root
 
     @property
     def addons_dir(self) -> Path:

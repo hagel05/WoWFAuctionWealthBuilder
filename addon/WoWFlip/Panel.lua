@@ -6,7 +6,7 @@
 -- player's click there is what spends gold (see Trade.lua).
 local ADDON, ns = ...
 
-local ROWS, ROW_H, WIDTH = 12, 34, 300
+local ROWS, ROW_H, WIDTH = 12, 34, 340
 local panel, rows, offset = nil, {}, 0
 
 local function List()
@@ -74,6 +74,20 @@ function ns.RefreshPanel()
     offset = math.max(0, math.min(offset, #list - ROWS))
     local tab = WoWFlipDB.settings.tab
     local market = tab ~= "vendor"
+    -- Counts on the tabs, so flips on another tab are easy to spot.
+    local function Count(src)
+        local n = 0
+        for _, e in ipairs(src or {}) do
+            if not ns.IsDone(e.item_id) then n = n + 1 end
+        end
+        return n
+    end
+    local feed = ns.feed or {}
+    panel.marketTab:SetText("Market (" .. Count(feed.flips) .. ")")
+    panel.snapshotTab:SetText("Snapshot (" .. Count(feed.snapshot) .. ")")
+    panel.vendorTab:SetText("Vendor (" .. Count(feed.vendor) .. ")")
+    local sellCount = ns.SellList and #ns.SellList() or 0
+    panel.sellTab:SetText(sellCount > 0 and ("Sell (" .. sellCount .. ")") or "Sell")
     panel.marketTab:SetEnabled(tab ~= "market")
     panel.snapshotTab:SetEnabled(tab ~= "snapshot")
     panel.vendorTab:SetEnabled(tab ~= "vendor")
@@ -200,7 +214,11 @@ local function Build()
 
     local function Tab(label, key, x)
         local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-        b:SetSize(68, 20)
+        b:SetSize(80, 20)
+        -- Small font so labels with counts, e.g. "Snapshot (12)", fit.
+        b:SetNormalFontObject("GameFontNormalSmall")
+        b:SetHighlightFontObject("GameFontHighlightSmall")
+        b:SetDisabledFontObject("GameFontDisableSmall")
         b:SetPoint("TOPLEFT", x, -34)
         b:SetText(label)
         b:SetScript("OnClick", function()
@@ -211,9 +229,9 @@ local function Build()
         return b
     end
     panel.marketTab = Tab("Market", "market", 10)
-    panel.snapshotTab = Tab("Snapshot", "snapshot", 80)
-    panel.vendorTab = Tab("Vendor", "vendor", 150)
-    panel.sellTab = Tab("Sell", "sell", 220)
+    panel.snapshotTab = Tab("Snapshot", "snapshot", 91)
+    panel.vendorTab = Tab("Vendor", "vendor", 172)
+    panel.sellTab = Tab("Sell", "sell", 253)
 
     panel.status = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     panel.status:SetPoint("TOPLEFT", 12, -58)
