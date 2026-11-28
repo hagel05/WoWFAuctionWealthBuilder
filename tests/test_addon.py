@@ -208,3 +208,12 @@ def test_scan_updates_addon_and_uses_game_gold(tmp_path, monkeypatch):
     assert feed["bankroll"] == 777777
     data = cfg.addon.wow_dir / "_forever_" / "Interface" / "AddOns" / "WoWFlipData" / "Data.lua"
     assert f"generated_at={feed['generated_at']}" in data.read_text()
+
+
+def test_wow_dir_may_point_inside_the_game_folder(tmp_path):
+    cfg = make_cfg(tmp_path)
+    game = cfg.addon.wow_dir / "_forever_"
+    for wow_dir in (cfg.addon.wow_dir, game, game / "Interface" / "AddOns"):
+        assert WowInstall(wow_dir).root == game
+    with pytest.raises(FileNotFoundError, match="World of Warcraft folder"):
+        WowInstall(tmp_path)

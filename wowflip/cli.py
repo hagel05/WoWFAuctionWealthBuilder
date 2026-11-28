@@ -45,7 +45,7 @@ def local_game(cfg: Config):
     try:
         return wow_install(cfg)
     except FileNotFoundError as exc:
-        log.warning("Addon sync skipped: %s", exc)
+        log.warning("The in-game addon was NOT updated: %s", exc)
         return None
 
 
@@ -67,9 +67,12 @@ def scan_once(cfg: Config) -> int:
     feed = build_feed(result, cfg)
     write_json_atomic(feed_path(cfg), feed)
     if game:
-        game.write_feed(feed)
-        log.info("Updated the WoWFlipData addon. /reload in game to see the new list.")
+        data = game.write_feed(feed)
     print_summary(result, path)
+    if game:
+        print(f"In-game addon updated: {data}  (/reload in game to see it)")
+    elif not cfg.addon.sync_url:
+        print("In-game addon NOT updated: set [addon] wow_dir in config.toml (see README, \"In-game addon\").")
     return 0
 
 

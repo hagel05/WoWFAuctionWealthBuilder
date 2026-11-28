@@ -112,6 +112,9 @@ check(WoWFlipPanel.status._text:find("snapshot"), "status names snapshot flips: 
 WoWFlipDB.settings.tab = "vendor"
 check(#ns.PanelList() == #ns.feed.vendor, "vendor tab lists vendor flips")
 ns.RefreshPanel()
+check(WoWFlipPanel.vendorTab._text == "Vendor (" .. #ns.feed.vendor .. ")", "vendor tab shows its count: " ..
+    tostring(WoWFlipPanel.vendorTab._text))
+check(WoWFlipPanel.marketTab._text:find("^Market %("), "market tab shows its count")
 
 ---------------------------------------------------------------------------
 -- Buy, list and collect (stubbed C_AuctionHouse)
