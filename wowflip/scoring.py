@@ -11,7 +11,8 @@ listing, p = chance one listing sells before it expires:
     days       = (Q + qty) / daily sales
     score      = net profit * qty * min(1, daily sales / qty) / (1 + volatility)
 
-Q is units already listed at or below T that we are not buying.
+Q is units already listed below T that we are not buying (at or below T if
+the auction house sold the oldest listing first; WoW Forever sells the newest).
 """
 
 from __future__ import annotations
@@ -246,7 +247,11 @@ def evaluate_item(
     cut = market.ah_cut
     max_cost = profile.max_flip_share * bankroll
     max_units = profile.max_item_days_of_sales * m.daily_sales
-    units_at_or_below_t = sum(l.quantity for l in listings if l.unit_price <= t)
+    if market.newest_first_at_same_price:
+        # LIFO: your fresh listing sells before older ones at the same price.
+        units_at_or_below_t = sum(l.quantity for l in listings if l.unit_price < t)
+    else:
+        units_at_or_below_t = sum(l.quantity for l in listings if l.unit_price <= t)
 
     chosen: list[Listing] = []
     reason = "no listing cheap enough"
@@ -337,6 +342,9 @@ def evaluate_snapshot(
 
     def target_for(rest: list[Listing]) -> tuple[float, float]:
         ref = unit_percentile(rest, 0.5)
+        if market.newest_first_at_same_price:
+            # LIFO: matching the next listing puts you first in line, no undercut needed.
+            return min((1 - market.undercut) * ref, rest[0].unit_price), ref
         return (1 - market.undercut) * min(ref, rest[0].unit_price), ref
 
     def concentrated(rest: list[Listing], ref: float) -> bool:

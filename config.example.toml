@@ -42,6 +42,7 @@ max_new_lookups_per_run = 1000
 # history_days = 14
 # recent_days = 3
 # undercut = 0.03
+# newest_first_at_same_price = true   # WoW Forever AH is LIFO at equal prices
 # ah_cut = 0.05
 # listing_hours = 24          # 2, 8 or 24
 # deposit_rates = { "2" = 0.05, "8" = 0.20, "24" = 0.60 }
