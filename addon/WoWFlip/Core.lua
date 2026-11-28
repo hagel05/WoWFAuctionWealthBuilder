@@ -29,6 +29,59 @@ function ns.LoadFeed()
     for _, f in ipairs(feed.snapshot) do ns.snapshotByItem[f.item_id] = f end
 end
 
+-- The data addon is load-on-demand, so WoWFlip loads it itself and can say
+-- exactly why when that fails (turned off, folder not seen, out of date).
+local DATA = "WoWFlipData"
+
+local function AddOnAPI()
+    local A = C_AddOns or {}
+    return {
+        info = A.GetAddOnInfo or GetAddOnInfo,
+        loaded = A.IsAddOnLoaded or IsAddOnLoaded,
+        enable = A.EnableAddOn or EnableAddOn,
+        load = A.LoadAddOn or LoadAddOn,
+    }
+end
+
+local REASONS = {
+    MISSING = "WoW doesn't see the WoWFlipData folder. Quit WoW completely and start it again (/reload " ..
+        "doesn't find new addon folders). If it's still missing, compare the scan's \"In-game addon updated\" " ..
+        "path with your WoW folder.",
+    DISABLED = "WoWFlip Data was turned off in the AddOns list. It's on now: type /reload.",
+    INTERFACE_VERSION = "WoWFlip Data is marked out of date. Tick \"Load out of date AddOns\" in the AddOns " ..
+        "list at character select, then log in again.",
+    NOT_DEMAND_LOADED = "WoWFlip Data is an older copy. Run a scan (or `wowflip sync --force`), then quit and " ..
+        "restart WoW.",
+}
+
+function ns.EnsureData()
+    ns.dataProblem = nil
+    if WoWFlipData_Feed ~= nil then return true end
+    local api = AddOnAPI()
+    local loaded = api.loaded and api.loaded(DATA)
+    if not loaded and api.info then
+        local name, _, _, _, reason = api.info(DATA)
+        if not name or reason == "MISSING" then
+            ns.dataProblem = REASONS.MISSING
+            return false
+        end
+    end
+    if not loaded and api.load then
+        if api.enable then pcall(api.enable, DATA) end
+        local ok, why = api.load(DATA)
+        if not ok then
+            ns.dataProblem = REASONS[why or ""] or ("Couldn't load WoWFlip Data (" .. tostring(why) .. ").")
+            return false
+        end
+    end
+    if WoWFlipData_Feed == nil then
+        ns.dataProblem = "WoWFlip Data has no scan in it yet. Run `wowflip scan` with [addon] wow_dir set " ..
+            "(its last line should say \"In-game addon updated\"), then /reload."
+        return false
+    end
+    return true
+end
+
 function ns.FeedAge()
     if not ns.feed or not ns.feed.generated_at then return nil end
     return Now() - ns.feed.generated_at
@@ -90,6 +143,7 @@ events:RegisterEvent("PLAYER_MONEY")
 events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON then
         InitDB()
+        ns.EnsureData()
         ns.LoadFeed()
     elseif event == "PLAYER_LOGIN" then
         ns.RecordGold()
@@ -99,7 +153,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
             if ns.FeedIsOld() then msg = msg .. " That's old: is the sync helper running?" end
             ns.Print(msg)
         else
-            ns.Print("No flip data yet. Run the sync helper, then /reload.")
+            ns.Print("No flip data loaded. " .. (ns.dataProblem or "Run the sync helper, then /reload."))
         end
     elseif event == "AUCTION_HOUSE_SHOW" then
         ns.ahOpen = true
@@ -149,7 +203,7 @@ SlashCmdList["WOWFLIP"] = function(msg)
                 #ns.feed.vendor .. " vendor flips, bankroll " ..
                 ns.Money(ns.feed.bankroll) .. " (" .. tostring(ns.feed.profile) .. ").")
         else
-            ns.Print("No flip data loaded.")
+            ns.Print("No flip data loaded. " .. (ns.dataProblem or ""))
         end
     else
         ns.Print("/flip  show or hide the panel")

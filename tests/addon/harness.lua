@@ -292,6 +292,24 @@ check(WoWFlipDB.settings.side == "left", "/flip left")
 SlashCmdList.WOWFLIP("status")
 check(ns.Money(12345, true) == "1g 23s 45c", "money format")
 check(ns.Money(7, true) == "7c", "money format copper only")
+-- Data addon problems are explained, and a turned-off data addon is turned on.
+local savedFeed = WoWFlipData_Feed
+WoWFlipData_Feed = nil
+local enabled
+C_AddOns = {
+    IsAddOnLoaded = function() return false end,
+    GetAddOnInfo = function(name) return nil, nil, nil, false, "MISSING" end,
+    EnableAddOn = function(name) enabled = name end,
+    LoadAddOn = function() return nil, "DISABLED" end,
+}
+check(not ns.EnsureData() and ns.dataProblem:find("Quit WoW completely", 1, true), "explains a missing data folder")
+C_AddOns.GetAddOnInfo = function(name) return name, "WoWFlip Data", "", true, nil end
+check(not ns.EnsureData() and ns.dataProblem:find("It's on now", 1, true) and enabled == "WoWFlipData",
+    "turns a disabled data addon back on")
+C_AddOns.LoadAddOn = function() WoWFlipData_Feed = savedFeed; return true end
+check(ns.EnsureData() and ns.dataProblem == nil, "loads the data addon on demand")
+C_AddOns = nil
+
 -- Stale data warning.
 NOW = NOW + 5 * 3600
 check(ns.FeedIsOld(), "old scans are flagged")

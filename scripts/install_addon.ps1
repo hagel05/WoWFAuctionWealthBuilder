@@ -8,8 +8,12 @@ if (-not (Test-Path (Join-Path $WowDir $Game))) { throw "Not found: $(Join-Path 
 New-Item -ItemType Directory -Force -Path $addons | Out-Null
 $src = Join-Path (Split-Path $PSScriptRoot) "addon"
 Copy-Item -Recurse -Force (Join-Path $src "WoWFlip") $addons
-# Keep the data addon's current Data.lua if the sync helper already wrote one.
-if (-not (Test-Path (Join-Path $addons "WoWFlipData\Data.lua"))) {
-    Copy-Item -Recurse -Force (Join-Path $src "WoWFlipData") $addons
+# Always refresh the data addon's .toc, but keep its Data.lua if a scan already wrote one.
+$data = Join-Path $addons "WoWFlipData"
+New-Item -ItemType Directory -Force -Path $data | Out-Null
+Copy-Item -Force (Join-Path $src "WoWFlipData\WoWFlipData.toc") $data
+if (-not (Test-Path (Join-Path $data "Data.lua"))) {
+    Copy-Item -Force (Join-Path $src "WoWFlipData\Data.lua") $data
 }
-Write-Host "Installed WoWFlip into $addons. Restart WoW or type /reload."
+Write-Host "Installed WoWFlip and WoWFlip Data into $addons."
+Write-Host "If WoW is running, quit it completely and start it again (/reload does not find new addon folders)."

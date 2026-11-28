@@ -36,12 +36,26 @@ def client_for(cfg: Config) -> BlizzardClient:
     return BlizzardClient(cfg.client_id, cfg.client_secret, cfg.region)
 
 
+# Where Battle.net installs WoW by default; used when [addon] wow_dir isn't set.
+DEFAULT_WOW_DIRS = (
+    r"C:\Program Files (x86)\World of Warcraft",
+    r"C:\Program Files\World of Warcraft",
+)
+
+
 def local_game(cfg: Config):
     """The WoW folder on this PC, when the scanner and the game share a PC."""
-    if not cfg.addon.wow_dir or cfg.addon.sync_url:
+    if cfg.addon.sync_url:
         return None
+    from wowflip.addon_sync import WowInstall
     from wowflip.sync import wow_install
 
+    if not cfg.addon.wow_dir:
+        for candidate in DEFAULT_WOW_DIRS:
+            if (Path(candidate) / cfg.addon.game_folder).is_dir():
+                log.info("Using the WoW folder at %s ([addon] wow_dir is not set).", candidate)
+                return WowInstall(candidate, cfg.addon.game_folder)
+        return None
     try:
         return wow_install(cfg)
     except FileNotFoundError as exc:

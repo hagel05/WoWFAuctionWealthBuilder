@@ -25,7 +25,8 @@ DATA_TOC = f"""## Interface: {INTERFACE}
 ## Title: WoWFlip Data
 ## Notes: Flip list written by the wowflip sync helper. Do not edit; it is replaced after each scan.
 ## Author: wowflip
-## Version: 1
+## Version: 2
+## LoadOnDemand: 1
 Data.lua
 """
 

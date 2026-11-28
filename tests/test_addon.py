@@ -217,3 +217,14 @@ def test_wow_dir_may_point_inside_the_game_folder(tmp_path):
         assert WowInstall(wow_dir).root == game
     with pytest.raises(FileNotFoundError, match="World of Warcraft folder"):
         WowInstall(tmp_path)
+
+
+def test_scan_finds_default_wow_folder_without_config(tmp_path, monkeypatch):
+    from wowflip import cli
+
+    wow = tmp_path / "World of Warcraft"
+    (wow / "_forever_" / "Interface" / "AddOns").mkdir(parents=True)
+    monkeypatch.setattr(cli, "DEFAULT_WOW_DIRS", (str(tmp_path / "missing"), str(wow)))
+    game = cli.local_game(Config())
+    assert game is not None and game.root == wow / "_forever_"
+    assert cli.local_game(replace(Config(), addon=Addon(sync_url="http://x"))) is None
